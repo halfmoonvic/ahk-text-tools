@@ -1,0 +1,8 @@
+# Every text file in this repository is stored and checked out as LF.
+#
+# Git Bash cannot execute a script with CRLF line endings, so translate/google
+# and the .sh launcher must be LF. AutoHotkey and PowerShell read LF happily,
+# so keeping one convention throughout avoids checkout surprises on Windows.
+* text eol=lf
+
+*.dat.gz binary

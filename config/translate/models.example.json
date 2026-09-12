@@ -1,0 +1,28 @@
+{
+    "providers": {
+        "openai": {
+            "baseUrl": "https://api.openai.com/v1",
+            "api": "openai-responses",
+            "models": [
+                { "id": "gpt-5.6-sol", "temperature": 0.2 },
+                { "id": "gpt-5.6-terra", "temperature": 0.2 }
+            ]
+        },
+        "anthropic": {
+            "baseUrl": "https://api.anthropic.com",
+            "api": "anthropic-messages",
+            "models": [
+                { "id": "claude-opus-5", "temperature": 0.2 },
+                { "id": "claude-sonnet-5", "temperature": 0.2 }
+            ]
+        },
+        "deepseek": {
+            "baseUrl": "https://api.deepseek.com",
+            "api": "openai-completions",
+            "models": [
+                { "id": "deepseek-v4-flash", "temperature": 0.2 },
+                { "id": "deepseek-v4-pro", "temperature": 0.2 }
+            ]
+        }
+    }
+}

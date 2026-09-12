@@ -1,0 +1,11 @@
+# Real configuration — never commit. Only the *.example.json templates belong here.
+config/ahk/config.json
+config/translate/auth.json
+config/translate/settings.json
+config/translate/models.json
+
+# Fetched by deploy.ps1 (~18MB of kuromoji dictionaries)
+kana/vendor/
+
+node_modules/
+*.bak.*

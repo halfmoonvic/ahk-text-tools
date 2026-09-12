@@ -1,0 +1,20 @@
+{
+    "translate": ["google"],
+    "ui": {
+        "alwaysOnTop": false,
+        "theme": "auto",
+        "fontSize": 16,
+        "fontName": "Microsoft YaHei UI",
+        "width": 960,
+        "minHeight": 800,
+        "maxHeight": 1000,
+        "lineHeight": 1,
+        "padding": 14
+    },
+    "japanese": {
+        "kana": {
+            "to": "hiragana",
+            "mode": "furigana"
+        }
+    }
+}

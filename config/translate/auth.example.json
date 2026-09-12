@@ -1,0 +1,5 @@
+{
+    "openai": "sk-your-openai-key-here",
+    "anthropic": "sk-ant-your-anthropic-key-here",
+    "deepseek": "sk-your-deepseek-key-here"
+}

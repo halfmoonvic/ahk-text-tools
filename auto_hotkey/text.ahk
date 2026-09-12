@@ -214,12 +214,13 @@ CreateTextToolRows(batch, engines) {
 }
 
 InitializeTextToolInput(batch, text) {
-    if !batch.HasOwnProp("Search")
-        return
-    if Trim(text) != ""
-        batch.Search.Value := RegExReplace(text, "\r\n|\r|\n", " ")
-    batch.Search.Focus()
-    SendMessage(0x00B1, 0, -1, batch.Search.Hwnd)
+    ; Only the translate popup has an input box; kana still has to start its run.
+    if batch.HasOwnProp("Search") {
+        if Trim(text) != ""
+            batch.Search.Value := RegExReplace(text, "\r\n|\r|\n", " ")
+        batch.Search.Focus()
+        SendMessage(0x00B1, 0, -1, batch.Search.Hwnd)
+    }
     if Trim(text) != ""
         BeginTextToolRun(batch, text)
 }

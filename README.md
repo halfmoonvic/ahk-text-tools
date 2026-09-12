@@ -95,6 +95,10 @@ Read by the AutoHotkey front-end.
 Each `translate` entry is either `google` (free, no key) or `provider/model`,
 where `provider` matches a key in `models.json`.
 
+`japanese.kana.to` picks the reading script — `hiragana`, `katakana`, or
+`romaji`. `mode` is `ruby` for HTML `<ruby>` markup, or anything else
+(conventionally `furigana`) for the plain `日本語（にほんご）` form.
+
 ### `~\.config\translate\`
 
 | File | Purpose |
@@ -145,14 +149,6 @@ text-tools/
 ```
 
 Moving `text.ahk` out of `auto_hotkey/` breaks it.
-
-## Known issue
-
-`kana.ps1` reads its options from `~\.config\text_tools\config.json`, while
-`text.ahk` reads `~\.config\ahk\config.json`. Since `deploy.ps1` only creates
-the latter, the `japanese.kana` settings currently have no effect and kana
-conversion always uses its built-in defaults (`hiragana` / `furigana`). The
-conversion itself works; only the customisation is inert.
 
 ## License
 

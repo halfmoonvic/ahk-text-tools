@@ -76,7 +76,6 @@ function New-ParentDirectory([string] $Path) {
     }
 }
 
-# Copies only when the destination differs, so re-running is close to a no-op.
 function Copy-IfDifferent([string] $Source, [string] $Destination, [string] $Label) {
     $sourceHash = Get-FileHashOrNull $Source
     if ($null -eq $sourceHash) { throw "missing source file: $Source" }
@@ -184,7 +183,6 @@ function Get-MissingVendorFile([string] $VendorRoot) {
         $item = Get-Item -LiteralPath $path -ErrorAction SilentlyContinue
         if ($null -eq $item -or $item.Length -eq 0) { $missing.Add($file) }
     }
-    # Callers wrap this in @(), which restores an empty result to an empty array.
     return $missing.ToArray()
 }
 
@@ -274,7 +272,6 @@ function Compare-JsonShape($Expected, $Actual, [string] $Prefix = '') {
             foreach ($nested in Compare-JsonShape $property.Value $other.Value $name) { $differences.Add($nested) }
         }
     }
-    # Callers wrap this in @(), which restores an empty result to an empty array.
     return $differences.ToArray()
 }
 

@@ -43,13 +43,19 @@ function Get-KanaConfig {
         to = "hiragana"
         mode = "furigana"
     }
-    $configPath = Join-Path $HOME ".config\text_tools\config.json"
+    $homeDirectory = if ($env:HOME) { $env:HOME } else { $env:USERPROFILE }
+    $configPath = Join-Path $homeDirectory ".config\ahk\config.json"
 
     if (!(Test-Path -LiteralPath $configPath)) {
         return $default
     }
 
-    $root = (Get-Content -LiteralPath $configPath -Raw -Encoding UTF8) | ConvertFrom-Json
+    try {
+        $root = (Get-Content -LiteralPath $configPath -Raw -Encoding UTF8) | ConvertFrom-Json
+    } catch {
+        return $default
+    }
+
     $japanese = Get-KanaConfigValue $root "japanese" $null
     $kana = Get-KanaConfigValue $japanese "kana" $default
 

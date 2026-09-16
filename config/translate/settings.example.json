@@ -8,16 +8,11 @@
     "deepseek/deepseek-v4-flash": "off"
   },
   "proxy": {
-    "http": "",
-    "https": "",
+    "http": "http://127.0.0.1:7890",
+    "https": "http://127.0.0.1:7890",
     "providers": []
   },
-  "ui": {
-    "fontSize": 16,
-    "fontName": "Microsoft YaHei UI"
-  },
   "ai": {
-    "stream": true,
     "systemPrompt": "You are a direct translation engine. Translate only; do not reason, analyze, explain, add notes, or include labels. Output only the translated text without quotes. Preserve the original paragraph breaks and line breaks where possible."
   }
 }

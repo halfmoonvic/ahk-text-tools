@@ -16,7 +16,7 @@ function Get-TranslateCommonConfig {
         elseif ($env:XDG_CONFIG_HOME) { Join-Path $env:XDG_CONFIG_HOME 'translate' }
         else { Join-Path $HOME '.config\translate' }
     $directory = Resolve-TranslateFilePath $directory
-    $settings = Read-TranslateConfigFile (Join-Path $directory 'settings.json')
+    $settings = Read-TranslateConfigFile (Join-Path $directory 'config.json')
     $thresholdNode = Get-JsonMember $settings 'chineseRatioThreshold'; $thresholdText = '0.3'
     if ($null -ne $thresholdNode -and $thresholdNode.Kind -in @('number','string')) { $thresholdText = $thresholdNode.Value }
     elseif ($null -ne $thresholdNode) { throw 'chineseRatioThreshold must be a number from 0 to 1' }
@@ -50,7 +50,7 @@ function Get-TranslateConfig([string] $ModelOverride) {
     if ([string]::IsNullOrWhiteSpace($selected)) {
         $selection = Get-JsonMember $settings 'model'
         if ($null -eq $selection -or $selection.Kind -ne 'string' -or [string]::IsNullOrWhiteSpace($selection.Value)) {
-            throw 'settings.json must define model as a non-empty string when -Model is not supplied or is blank'
+            throw 'config.json must define model as a non-empty string when -Model is not supplied or is blank'
         }
         $selected = $selection.Value
     }

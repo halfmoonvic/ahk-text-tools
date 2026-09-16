@@ -105,7 +105,7 @@ where `provider` matches a key in `models.json`.
 | --- | --- |
 | `auth.json` | API keys, one per provider. **Never commit this.** |
 | `models.json` | Providers, their base URLs, API flavour, and models |
-| `settings.json` | Default model, proxy, language-detection threshold, system prompt |
+| `config.json` | Default model, proxy, language-detection threshold, system prompt |
 
 `api` in `models.json` must be one of `openai-completions`,
 `openai-responses`, or `anthropic-messages`.

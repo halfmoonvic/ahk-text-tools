@@ -337,7 +337,7 @@ function Install-Configuration {
 
     $map = @(
         @{ Template = 'config\ahk\config.example.json';            Target = 'ahk\config.json' }
-        @{ Template = 'config\translate\settings.example.json';    Target = 'translate\settings.json' }
+        @{ Template = 'config\translate\config.example.json';      Target = 'translate\config.json' }
         @{ Template = 'config\translate\models.example.json';      Target = 'translate\models.json' }
     )
 

@@ -1,4 +1,4 @@
-﻿function Resolve-TranslateFilePath([string] $Path) {
+function Resolve-TranslateFilePath([string] $Path) {
     $provider = $null; $drive = $null
     $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path, [ref]$provider, [ref]$drive)
     if ($provider.Name -ne 'FileSystem') { throw 'only FileSystem paths are supported' }

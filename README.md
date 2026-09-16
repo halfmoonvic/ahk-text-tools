@@ -70,7 +70,7 @@ Updating later:
 
 ## Configuration
 
-### `~\.config\ahk\config.json`
+### `~\.config\ahk\settings.json`
 
 Read by the AutoHotkey front-end.
 

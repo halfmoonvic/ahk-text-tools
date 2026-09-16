@@ -52,7 +52,7 @@ RunSelectedTextTool(title, scriptName) {
 
 ReadTextToolConfig(path := "") {
     if path = ""
-        path := GetHomeDir() "\.config\ahk\config.json"
+        path := GetHomeDir() "\.config\ahk\settings.json"
     config := Json.Parse(FileRead(path, "UTF-8"))
     if !(config is Map)
         throw Error("Text tools configuration must be a JSON object.")
@@ -70,7 +70,7 @@ ReadToolConfig(scriptName) {
 
 GetTranslateEngines(config) {
     if !config.Has("translate") || !(config["translate"] is Array) || !config["translate"].Length
-        throw Error("config.json: translate must be a nonempty array of engines.")
+        throw Error("settings.json: translate must be a nonempty array of engines.")
     for engine in config["translate"] {
         if Type(engine) != "String" || (engine != "google" && !RegExMatch(engine, "^[^/\s]+/[^\s]+$"))
             throw Error("Each translate entry must be google or a full provider/model identifier.")

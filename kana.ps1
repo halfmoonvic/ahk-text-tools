@@ -44,7 +44,7 @@ function Get-KanaConfig {
         mode = "furigana"
     }
     $homeDirectory = if ($env:HOME) { $env:HOME } else { $env:USERPROFILE }
-    $configPath = Join-Path $homeDirectory ".config\ahk\config.json"
+    $configPath = Join-Path $homeDirectory ".config\ahk\settings.json"
 
     if (!(Test-Path -LiteralPath $configPath)) {
         return $default

@@ -1,5 +1,5 @@
 # Real configuration — never commit. Only the *.example.json templates belong here.
-config/ahk/config.json
+config/ahk/settings.json
 config/translate/auth.json
 config/translate/config.json
 config/translate/models.json

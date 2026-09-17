@@ -19,13 +19,13 @@ OnMessage(0x4E, DrawTextToolButton) ; WM_NOTIFY / NM_CUSTOMDRAW
 OnMessage(0x20, TextToolSearchCursor) ; WM_SETCURSOR
 OnExit(ExitTextTools)
 
-^#a::RunSelectedTextTool("Translate", "translate.ps1")
+^#a::RunSelectedTextTool("Translate", "translate.ps1", true)
 ^#s::RunSelectedTextTool("Japanese Kana", "kana.ps1")
 
-RunSelectedTextTool(title, scriptName) {
+RunSelectedTextTool(title, scriptName, multiEngine := false) {
     try {
-        config := ReadToolConfig(scriptName)
-        engines := scriptName = "translate.ps1" ? GetTranslateEngines(config) : ["Japanese Kana"]
+        config := ReadToolConfig(multiEngine)
+        engines := multiEngine ? GetTranslateEngines(config) : [title]
     } catch as err {
         ShowStaticPopup(title, err.Message)
         return
@@ -52,10 +52,11 @@ ReadTextToolConfig(path := "") {
     return config
 }
 
-ReadToolConfig(scriptName) {
-    if scriptName = "translate.ps1"
+ReadToolConfig(multiEngine) {
+    ; Only an engine list is required up front; every other tool validates its
+    ; own options and falls back to defaults when the file is missing.
+    if multiEngine
         return ReadTextToolConfig()
-    ; Kana keeps its existing missing-config defaults; its script validates options.
     try return ReadTextToolConfig()
     catch
         return Map()

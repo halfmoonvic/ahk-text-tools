@@ -50,25 +50,50 @@ $script:Warnings = [Collections.Generic.List[string]]::new()
 
 #region helpers ---------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Write-Step <Message>
+#   Announce the start of a deployment stage.
+# ---------------------------------------------------------------------------
 function Write-Step([string] $Message) {
     Write-Host ''
     Write-Host "==> $Message" -ForegroundColor Cyan
 }
 
+# ---------------------------------------------------------------------------
+# Write-Item <State> <Path> [<Color>]
+#   Report one file's outcome in an aligned two-column line.
+# ---------------------------------------------------------------------------
 function Write-Item([string] $State, [string] $Path, [ConsoleColor] $Color = 'Gray') {
     Write-Host ('    {0,-10} {1}' -f $State, $Path) -ForegroundColor $Color
 }
 
+# ---------------------------------------------------------------------------
+# Write-Warn <Message>
+#   Record a non-fatal problem and echo it. Collected warnings are replayed in
+#   the final summary so they are not lost in the scroll.
+# ---------------------------------------------------------------------------
 function Write-Warn([string] $Message) {
     $script:Warnings.Add($Message)
     Write-Host "    warning   $Message" -ForegroundColor Yellow
 }
 
+# ---------------------------------------------------------------------------
+# Get-FileHashOrNull <Path>
+#   SHA-256 of a file, or $null when it does not exist. The null return is how
+#   callers distinguish "absent" from "present but different".
+# ---------------------------------------------------------------------------
 function Get-FileHashOrNull([string] $Path) {
-    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        return $null
+    }
+
     return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
 }
 
+# ---------------------------------------------------------------------------
+# New-ParentDirectory <Path>
+#   Create the directory that will hold Path, if it is missing.
+# ---------------------------------------------------------------------------
 function New-ParentDirectory([string] $Path) {
     $parent = Split-Path -Parent $Path
     if ($parent -and -not (Test-Path -LiteralPath $parent)) {
@@ -76,9 +101,17 @@ function New-ParentDirectory([string] $Path) {
     }
 }
 
+# ---------------------------------------------------------------------------
+# Copy-IfDifferent <Source> <Destination> <Label>
+#   Copy only when the contents differ, so repeat runs leave timestamps alone
+#   and the summary counts reflect real changes.
+# ---------------------------------------------------------------------------
 function Copy-IfDifferent([string] $Source, [string] $Destination, [string] $Label) {
     $sourceHash = Get-FileHashOrNull $Source
-    if ($null -eq $sourceHash) { throw "missing source file: $Source" }
+    if ($null -eq $sourceHash) {
+        throw "missing source file: $Source"
+    }
+
     $destinationHash = Get-FileHashOrNull $Destination
 
     if ($sourceHash -eq $destinationHash) {
@@ -87,20 +120,38 @@ function Copy-IfDifferent([string] $Source, [string] $Destination, [string] $Lab
     }
 
     $isNew = $null -eq $destinationHash
-    $action = if ($isNew) { 'create' } else { 'update' }
-    if (-not $PSCmdlet.ShouldProcess($Destination, $action)) { return }
+    $action =
+        if ($isNew) {
+            'create'
+        } else {
+            'update'
+        }
+    if (-not $PSCmdlet.ShouldProcess($Destination, $action)) {
+        return
+    }
 
     New-ParentDirectory $Destination
     Copy-Item -LiteralPath $Source -Destination $Destination -Force
 
-    if ($isNew) { $script:Stats.Created++; Write-Item 'created' $Label Green }
-    else        { $script:Stats.Updated++; Write-Item 'updated' $Label Green }
+    if ($isNew) {
+        $script:Stats.Created++
+        Write-Item 'created' $Label Green
+    } else {
+        $script:Stats.Updated++
+        Write-Item 'updated' $Label Green
+    }
 }
 
 #endregion
 
 #region stage 0: optional git pull --------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Invoke-RepositoryUpdate
+#   Fast-forward the checkout before deploying. Refuses to touch a dirty tree
+#   and downgrades every failure to a warning: a failed pull should still
+#   deploy whatever is already checked out.
+# ---------------------------------------------------------------------------
 function Invoke-RepositoryUpdate {
     Write-Step 'Updating repository'
 
@@ -119,10 +170,14 @@ function Invoke-RepositoryUpdate {
         return
     }
 
-    if (-not $PSCmdlet.ShouldProcess($RepoRoot, 'git pull --ff-only')) { return }
+    if (-not $PSCmdlet.ShouldProcess($RepoRoot, 'git pull --ff-only')) {
+        return
+    }
 
     & git -C $RepoRoot pull --ff-only
-    if ($LASTEXITCODE -ne 0) { Write-Warn 'git pull failed; deploying the current checkout' }
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warn 'git pull failed; deploying the current checkout'
+    }
 }
 
 #endregion
@@ -132,6 +187,11 @@ function Invoke-RepositoryUpdate {
 # text.ahk derives the project root by stripping "\auto_hotkey\<file>" from its
 # own path, then looks for translate.ps1 and kana.ps1 there. The two-level
 # layout below is therefore mandatory - do not flatten it.
+# ---------------------------------------------------------------------------
+# Install-ProgramFiles
+#   Copy the scripts into TargetDir, preserving the repository's directory
+#   layout for the reason described above.
+# ---------------------------------------------------------------------------
 function Install-ProgramFiles {
     Write-Step "Deploying program files to $TargetDir"
 
@@ -176,16 +236,28 @@ $script:DictionaryFiles = @(
 
 $script:VendorFiles = @('kuroshiro.min.js', 'kuromoji.js') + $script:DictionaryFiles
 
+# ---------------------------------------------------------------------------
+# Get-MissingVendorFile <VendorRoot>
+#   List vendor files that are absent or zero-length. Empty files count as
+#   missing so an interrupted download is retried rather than trusted.
+# ---------------------------------------------------------------------------
 function Get-MissingVendorFile([string] $VendorRoot) {
     $missing = [Collections.Generic.List[string]]::new()
     foreach ($file in $script:VendorFiles) {
         $path = Join-Path $VendorRoot $file
         $item = Get-Item -LiteralPath $path -ErrorAction SilentlyContinue
-        if ($null -eq $item -or $item.Length -eq 0) { $missing.Add($file) }
+        if ($null -eq $item -or $item.Length -eq 0) {
+            $missing.Add($file)
+        }
     }
     return $missing.ToArray()
 }
 
+# ---------------------------------------------------------------------------
+# Expand-NpmPackage <Name> <Destination>
+#   Download the latest tarball for a package and extract it. Uses the
+#   registry API and bundled tar directly, so npm need not be installed.
+# ---------------------------------------------------------------------------
 function Expand-NpmPackage([string] $Name, [string] $Destination) {
     $metadata = Invoke-RestMethod -Uri "https://registry.npmjs.org/$Name/latest" -UseBasicParsing
     $archive = Join-Path $Destination "$Name.tgz"
@@ -205,13 +277,22 @@ function Expand-NpmPackage([string] $Name, [string] $Destination) {
     New-Item -ItemType Directory -Path $extractRoot -Force | Out-Null
     # tar.exe ships with Windows 10 1803 and later.
     & tar -xzf $archive -C $extractRoot
-    if ($LASTEXITCODE -ne 0) { throw "failed to extract $Name (tar exit $LASTEXITCODE)" }
+    if ($LASTEXITCODE -ne 0) {
+        throw "failed to extract $Name (tar exit $LASTEXITCODE)"
+    }
 
     $packageRoot = Join-Path $extractRoot 'package'
-    if (-not (Test-Path -LiteralPath $packageRoot)) { throw "unexpected archive layout for $Name" }
+    if (-not (Test-Path -LiteralPath $packageRoot)) {
+        throw "unexpected archive layout for $Name"
+    }
     return $packageRoot
 }
 
+# ---------------------------------------------------------------------------
+# Install-KanaVendor
+#   Fetch the kuroshiro and kuromoji files the kana tool needs. Skipped when
+#   everything is already present unless -Force is given.
+# ---------------------------------------------------------------------------
 function Install-KanaVendor {
     Write-Step 'Checking kana vendor files'
 
@@ -224,10 +305,15 @@ function Install-KanaVendor {
         return
     }
 
-    if ($Force) { Write-Host '    -Force specified; re-downloading' }
-    else { Write-Host "    $($missing.Count) of $($script:VendorFiles.Count) files missing; downloading" }
+    if ($Force) {
+        Write-Host '    -Force specified; re-downloading'
+    } else {
+        Write-Host "    $($missing.Count) of $($script:VendorFiles.Count) files missing; downloading"
+    }
 
-    if (-not $PSCmdlet.ShouldProcess($vendorRoot, 'install vendor files')) { return }
+    if (-not $PSCmdlet.ShouldProcess($vendorRoot, 'install vendor files')) {
+        return
+    }
 
     $staging = Join-Path ([IO.Path]::GetTempPath()) ("text-tools-vendor-" + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $staging -Force | Out-Null
@@ -257,30 +343,58 @@ function Install-KanaVendor {
 
 #region stage 3: configuration ------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Compare-JsonShape <Expected> <Actual> [<Prefix>]
+#   Return dotted names of keys present in Expected but not in Actual,
+#   recursing into nested objects. Compares structure only, never values, so
+#   an existing config is reported as outdated without exposing its contents.
+# ---------------------------------------------------------------------------
 function Compare-JsonShape($Expected, $Actual, [string] $Prefix = '') {
     $differences = [Collections.Generic.List[string]]::new()
-    if ($null -eq $Expected -or $Expected -isnot [psobject]) { return $differences }
+    if ($null -eq $Expected -or $Expected -isnot [psobject]) {
+        return $differences
+    }
 
     foreach ($property in $Expected.PSObject.Properties) {
-        $name = if ($Prefix) { "$Prefix.$($property.Name)" } else { $property.Name }
-        $other = if ($Actual -is [psobject]) { $Actual.PSObject.Properties[$property.Name] } else { $null }
+        $name =
+            if ($Prefix) {
+                "$Prefix.$($property.Name)"
+            } else {
+                $property.Name
+            }
+        $other =
+            if ($Actual -is [psobject]) {
+                $Actual.PSObject.Properties[$property.Name]
+            } else {
+                $null
+            }
 
         if ($null -eq $other) {
             $differences.Add("$name (missing locally)")
         } elseif ($property.Value -is [psobject] -and $property.Value -isnot [string] -and
                   $property.Value -isnot [ValueType] -and $property.Value -isnot [Array]) {
-            foreach ($nested in Compare-JsonShape $property.Value $other.Value $name) { $differences.Add($nested) }
+            foreach ($nested in Compare-JsonShape $property.Value $other.Value $name) {
+                $differences.Add($nested)
+            }
         }
     }
     return $differences.ToArray()
 }
 
 # auth.json holds real API keys, so it is written once and never touched again.
+# ---------------------------------------------------------------------------
+# Install-ConfigFile <Template> <Destination> <Label> [-NeverOverwrite]
+#   Install a configuration file from its example template. An existing file
+#   is never overwritten silently; it is only reported when the template has
+#   gained keys it lacks.
+# ---------------------------------------------------------------------------
 function Install-ConfigFile([string] $Template, [string] $Destination, [string] $Label, [switch] $NeverOverwrite) {
     $exists = Test-Path -LiteralPath $Destination -PathType Leaf
 
     if (-not $exists) {
-        if (-not $PSCmdlet.ShouldProcess($Destination, 'create')) { return }
+        if (-not $PSCmdlet.ShouldProcess($Destination, 'create')) {
+            return
+        }
         New-ParentDirectory $Destination
         Copy-Item -LiteralPath $Template -Destination $Destination -Force
         $script:Stats.Created++
@@ -309,13 +423,17 @@ function Install-ConfigFile([string] $Template, [string] $Destination, [string] 
         try {
             $templateJson = Get-Content -LiteralPath $Template -Raw -Encoding UTF8 | ConvertFrom-Json
             $currentJson = Get-Content -LiteralPath $Destination -Raw -Encoding UTF8 | ConvertFrom-Json
-            if ($null -eq $currentJson) { throw 'file is empty or not a JSON object' }
+            if ($null -eq $currentJson) {
+                throw 'file is empty or not a JSON object'
+            }
             $differences = @(Compare-JsonShape $templateJson $currentJson)
             $parsed = $true
         } catch {
             Write-Warn "$Label could not be compared to the template: $($_.Exception.Message)"
         }
-        if (-not $parsed) { return }
+        if (-not $parsed) {
+            return
+        }
         if ($differences.Count -gt 0) {
             Write-Warn "$Label is missing keys present in the template: $($differences -join ', ')"
         } else {
@@ -324,7 +442,9 @@ function Install-ConfigFile([string] $Template, [string] $Destination, [string] 
         return
     }
 
-    if (-not $PSCmdlet.ShouldProcess($Destination, 'overwrite')) { return }
+    if (-not $PSCmdlet.ShouldProcess($Destination, 'overwrite')) {
+        return
+    }
     $backup = "$Destination.bak.$(Get-Date -Format 'yyyyMMdd-HHmmss')"
     Copy-Item -LiteralPath $Destination -Destination $backup -Force
     Copy-Item -LiteralPath $Template -Destination $Destination -Force
@@ -332,6 +452,10 @@ function Install-ConfigFile([string] $Template, [string] $Destination, [string] 
     Write-Item 'updated' "$Label (backup: $(Split-Path -Leaf $backup))" Green
 }
 
+# ---------------------------------------------------------------------------
+# Install-Configuration
+#   Install every configuration template into ConfigDir.
+# ---------------------------------------------------------------------------
 function Install-Configuration {
     Write-Step "Deploying configuration to $ConfigDir"
 
@@ -356,7 +480,9 @@ function Install-Configuration {
 Write-Host ''
 Write-Host 'text-tools deploy' -ForegroundColor White
 
-if ($Update) { Invoke-RepositoryUpdate }
+if ($Update) {
+    Invoke-RepositoryUpdate
+}
 
 Install-ProgramFiles
 if ($SkipVendor) {

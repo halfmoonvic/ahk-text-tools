@@ -1,3 +1,8 @@
+# run-task.ps1 - Runs one text tool for the AutoHotkey front-end.
+#
+# text.ahk invokes this instead of the tool directly so that every task gets a
+# single exit code and an error message on stderr, whatever the tool does.
+
 param(
     [Parameter(Mandatory=$true)][string] $Script,
     [Parameter(Mandatory=$true)][string] $InputFile,
@@ -13,8 +18,14 @@ $env:TEMP = [IO.Path]::GetDirectoryName($OutputFile)
 $env:TMP = $env:TEMP
 try {
     $arguments = @{ InputFile=$InputFile; OutputFile=$OutputFile }
-    if ($Mode) { $arguments.Mode = $Mode }
-    if ($Model) { $arguments.Model = $Model }
+    if ($Mode) {
+        $arguments.Mode = $Mode
+    }
+
+    if ($Model) {
+        $arguments.Model = $Model
+    }
+
     & $Script @arguments
     exit $LASTEXITCODE
 } catch {

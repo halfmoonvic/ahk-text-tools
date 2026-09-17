@@ -1,18 +1,18 @@
 {
-  "model": "deepseek/deepseek-v4-flash",
-  "chineseRatioThreshold": 0.3,
-  "defaultThinkingLevel": "off",
-  "modelThinkingLevels": {
-    "openai/gpt-5.6-sol": "off",
-    "anthropic/claude-opus-5": "off",
-    "deepseek/deepseek-v4-flash": "off"
-  },
-  "proxy": {
-    "http": "http://127.0.0.1:7890",
-    "https": "http://127.0.0.1:7890",
-    "providers": []
-  },
-  "ai": {
-    "systemPrompt": "You are a direct translation engine. Translate only; do not reason, analyze, explain, add notes, or include labels. Output only the translated text without quotes. Preserve the original paragraph breaks and line breaks where possible."
-  }
+    "model": "deepseek/deepseek-v4-flash",
+    "chineseRatioThreshold": 0.3,
+    "defaultThinkingLevel": "off",
+    "modelThinkingLevels": {
+        "openai/gpt-5.6-sol": "off",
+        "anthropic/claude-opus-5": "off",
+        "deepseek/deepseek-v4-flash": "off"
+    },
+    "proxy": {
+        "http": "http://127.0.0.1:7890",
+        "https": "http://127.0.0.1:7890",
+        "providers": []
+    },
+    "ai": {
+        "systemPrompt": "You are a direct translation engine. Translate only; do not reason, analyze, explain, add notes, or include labels. Output only the translated text without quotes. Preserve the original paragraph breaks and line breaks where possible."
+    }
 }

@@ -158,8 +158,7 @@ CreateTextToolWindow(title, scriptName, engines, config) {
     batch.Gui.SetFont("s" batch.Ui.FontSize, batch.Ui.FontName)
     batch.Scale := A_ScreenDPI / 96
     batch.SmallFontSize := Min(11, batch.Ui.FontSize)
-    if scriptName = "translate.ps1"
-        CreateTranslateHeader(batch)
+    CreateTextToolHeader(batch)
     batch.View := Gui("+Parent" batch.Hwnd " -Caption +0x40000000 +0x200000 -DPIScale")
     batch.View.SetFont("s" batch.Ui.FontSize, batch.Ui.FontName)
     TextToolViews[batch.View.Hwnd] := batch
@@ -172,7 +171,7 @@ CreateTextToolWindow(title, scriptName, engines, config) {
     return batch
 }
 
-CreateTranslateHeader(batch) {
+CreateTextToolHeader(batch) {
     global TextToolInputs
     batch.HeaderHeight := Round(78 * batch.Scale)
     batch.SearchBackground := batch.Gui.Add("Text", "x12 y12 w400 h36", "")
@@ -180,7 +179,7 @@ CreateTranslateHeader(batch) {
     batch.SearchLineHeight := TextToolInputLineHeight(batch.Search.Hwnd)
     inputPadding := Round(8 * batch.Scale)
     SendMessage(0xD3, 3, inputPadding | (inputPadding << 16), batch.Search.Hwnd)
-    batch.Submit := batch.Gui.Add("Button", "x420 y12 w110 h36", "Translate")
+    batch.Submit := batch.Gui.Add("Button", "x420 y12 w110 h36", "Run")
     batch.Submit.SetFont("s" batch.SmallFontSize)
     batch.Hint := batch.Gui.Add("Text", "x12 y50 w400 h24", "")
     batch.Hint.SetFont("s" Min(10, batch.Ui.FontSize))
@@ -188,12 +187,12 @@ CreateTranslateHeader(batch) {
     batch.InputProc := CallbackCreate(TextToolInputMessage, , 6)
     if !DllCall("comctl32\SetWindowSubclass", "ptr", batch.Search.Hwnd,
         "ptr", batch.InputProc, "uptr", 1, "uptr", 0)
-        throw Error("Could not initialize the translation input.")
+        throw Error("Could not initialize the text input.")
     TextToolInputs[batch.Search.Hwnd] := batch
     batch.BackgroundProc := CallbackCreate(TextToolBackgroundMessage, , 6)
     if !DllCall("comctl32\SetWindowSubclass", "ptr", batch.SearchBackground.Hwnd,
         "ptr", batch.BackgroundProc, "uptr", 1, "uptr", 0)
-        throw Error("Could not initialize the translation input.")
+        throw Error("Could not initialize the text input.")
 }
 
 CreateTextToolRows(batch, engines) {
@@ -214,13 +213,10 @@ CreateTextToolRows(batch, engines) {
 }
 
 InitializeTextToolInput(batch, text) {
-    ; Only the translate popup has an input box; kana still has to start its run.
-    if batch.HasOwnProp("Search") {
-        if Trim(text) != ""
-            batch.Search.Value := RegExReplace(text, "\r\n|\r|\n", " ")
-        batch.Search.Focus()
-        SendMessage(0x00B1, 0, -1, batch.Search.Hwnd)
-    }
+    if Trim(text) != ""
+        batch.Search.Value := RegExReplace(text, "\r\n|\r|\n", " ")
+    batch.Search.Focus()
+    SendMessage(0x00B1, 0, -1, batch.Search.Hwnd)
     if Trim(text) != ""
         BeginTextToolRun(batch, text)
 }
@@ -416,7 +412,7 @@ SubmitTextTool(batch) {
         return
     text := batch.Search.Value
     if Trim(text) = "" {
-        batch.Hint.Value := "Enter text to translate."
+        batch.Hint.Value := "Enter text."
         batch.Search.Focus()
         return
     }
@@ -1057,7 +1053,7 @@ TextToolInputLineHeight(hwnd) {
     try {
         metrics := Buffer(60, 0)
         if !DllCall("GetTextMetricsW", "ptr", dc, "ptr", metrics)
-            throw Error("Could not measure the translation input font.")
+            throw Error("Could not measure the text input font.")
         return NumGet(metrics, 0, "int")
     } finally {
         DllCall("SelectObject", "ptr", dc, "ptr", previous, "ptr")

@@ -31,21 +31,14 @@ RunSelectedTextTool(title, scriptName) {
         return
     }
     oldClipboard := ClipboardAll()
-    oldText := A_Clipboard
     text := ""
     try {
         A_Clipboard := ""
         Send "^c"
         if ClipWait(0.5)
             text := A_Clipboard
-        if Trim(text) = "" && scriptName != "translate.ps1"
-            text := oldText
     } finally {
         A_Clipboard := oldClipboard
-    }
-    if Trim(text) = "" && scriptName != "translate.ps1" {
-        ShowStaticPopup(title, "No selected text and clipboard is empty.")
-        return
     }
     StartTextToolBatch(title, scriptName, engines, text, config)
 }

@@ -6,3 +6,4 @@
 * text eol=lf
 
 *.dat.gz binary
+*.gif binary

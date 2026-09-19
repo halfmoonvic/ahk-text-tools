@@ -77,8 +77,8 @@ function Get-KanaConfig {
         to = 'hiragana'
         mode = 'furigana'
     }
-    $homeDirectory = if ($env:HOME) { $env:HOME } else { $env:USERPROFILE }
-    $configPath = Join-Path $homeDirectory '.config\ahk\settings.json'
+    # Duplicated from Config.ps1: this script does not import the module.
+    $configPath = Join-Path $env:USERPROFILE '.config\ahk\settings.json'
 
     if (!(Test-Path -LiteralPath $configPath)) {
         return $default

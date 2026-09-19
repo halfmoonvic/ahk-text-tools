@@ -23,8 +23,8 @@
 #>
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
-    [string] $TargetDir = (Join-Path $HOME '.local\bin'),
-    [string] $ConfigDir = (Join-Path $HOME '.config'),
+    [string] $TargetDir = (Join-Path $env:USERPROFILE '.local\bin'),
+    [string] $ConfigDir = (Join-Path $env:USERPROFILE '.config'),
     [switch] $Update,
     [switch] $SkipVendor,
     [switch] $Force

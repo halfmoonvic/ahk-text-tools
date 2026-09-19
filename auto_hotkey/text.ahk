@@ -45,7 +45,7 @@ RunSelectedTextTool(title, scriptName, multiEngine := false) {
 
 ReadTextToolConfig(path := "") {
     if path = ""
-        path := GetHomeDir() "\.config\ahk\settings.json"
+        path := GetConfigRoot() "\ahk\settings.json"
     config := Json.Parse(FileRead(path, "UTF-8"))
     if !(config is Map)
         throw Error("Text tools configuration must be a JSON object.")
@@ -1151,7 +1151,7 @@ CloseStaticTextPopup(popup) {
     popup.Destroy()
 }
 
-GetHomeDir() {
-    directory := EnvGet("HOME")
-    return directory != "" ? directory : EnvGet("USERPROFILE")
+; Not HOME: Git Bash sets it to a POSIX path Windows cannot resolve.
+GetConfigRoot() {
+    return EnvGet("USERPROFILE") "\.config"
 }

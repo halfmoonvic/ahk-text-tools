@@ -12,6 +12,8 @@ The translate popup also has a text box, so you can keep typing new phrases
 without re-selecting anything. Results stream in as they arrive, each engine in
 its own panel with a Copy button.
 
+![Selecting text and translating it in the popup](docs/popup.gif)
+
 ## Requirements
 
 | Component | Needed for | Notes |
@@ -125,6 +127,8 @@ to diagnose a problem without involving AutoHotkey:
 "piped input works too" | .\translate.ps1
 .\kana.ps1 -Text "日本語"
 ```
+
+![Translating a phrase from the command line](docs/cli.gif)
 
 ## Layout
 

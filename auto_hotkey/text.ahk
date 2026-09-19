@@ -152,6 +152,8 @@ CreateTextToolWindow(title, scriptName, engines, config) {
     batch.Gui.SetFont("s" batch.Ui.FontSize, batch.Ui.FontName)
     batch.Scale := A_ScreenDPI / 96
     batch.SmallFontSize := Min(11, batch.Ui.FontSize)
+    batch.BodyFont := CreateTextToolFont(batch.Ui.FontName, batch.Ui.FontSize, batch.Scale)
+    batch.SmallFont := CreateTextToolFont(batch.Ui.FontName, batch.SmallFontSize, batch.Scale)
     CreateTextToolHeader(batch)
     batch.View := Gui("+Parent" batch.Hwnd " -Caption +0x40000000 +0x200000 -DPIScale")
     batch.View.SetFont("s" batch.Ui.FontSize, batch.Ui.FontName)
@@ -199,8 +201,8 @@ CreateTextToolRows(batch, engines) {
         task.Copy := batch.View.Add("Button", "x500 y12 w100 h36", "Copy")
         task.Copy.SetFont("s" batch.SmallFontSize)
         task.Copy.OnEvent("Click", CopyTextTool.Bind(task))
-        task.Edit := CreateRichEdit(batch.View.Hwnd, batch.Ui.FontName, batch.Ui.FontSize, batch.Scale)
-        task.ErrorEdit := CreateRichEdit(batch.View.Hwnd, batch.Ui.FontName, batch.SmallFontSize, batch.Scale)
+        task.Edit := CreateRichEdit(batch.View.Hwnd, batch.BodyFont)
+        task.ErrorEdit := CreateRichEdit(batch.View.Hwnd, batch.SmallFont)
         DllCall("ShowWindow", "ptr", task.ErrorEdit, "int", 0)
         batch.Tasks.Push(task)
     }
@@ -311,9 +313,21 @@ UpdateRichText(hwnd, previous, text, lineHeight) {
     return true
 }
 
+CreateTextToolFont(fontName, fontPt, scale) {
+    lf := Buffer(92, 0)                                    ; LOGFONTW
+    NumPut("int", -Round(fontPt * 96 * scale / 72), lf, 0)
+    NumPut("int", 400, lf, 16)
+    NumPut("uchar", 1, lf, 23)
+    StrPut(fontName, lf.Ptr + 28, 32)
+    hFont := DllCall("CreateFontIndirectW", "ptr", lf.Ptr, "ptr")
+    if !hFont
+        throw Error("Could not create the popup font.")
+    return hFont
+}
+
 ; A plain Edit fixes its line height to the font, so the text boxes are RichEdit
 ; controls instead. AHK cannot create one, hence the raw CreateWindowExW.
-CreateRichEdit(parentHwnd, fontName, fontPt, scale) {
+CreateRichEdit(parentHwnd, hFont) {
     static loaded := DllCall("LoadLibrary", "str", "Msftedit.dll", "ptr")
     ; WS_CHILD|WS_VISIBLE|WS_TABSTOP|ES_MULTILINE|ES_READONLY|ES_AUTOVSCROLL.
     ; No WS_VSCROLL: blocks size to their content, so only the window scrolls.
@@ -326,13 +340,8 @@ CreateRichEdit(parentHwnd, fontName, fontPt, scale) {
     if !hwnd
         throw Error("Could not create the RichEdit text box.")
     ; A RichEdit inherits nothing from the Gui, so font and colours are explicit.
-    lf := Buffer(92, 0)                                    ; LOGFONTW
-    NumPut("int", -Round(fontPt * 96 * scale / 72), lf, 0)
-    NumPut("int", 400, lf, 16)
-    NumPut("uchar", 1, lf, 23)
-    StrPut(fontName, lf.Ptr + 28, 32)
     DllCall("SendMessageW", "ptr", hwnd, "uint", 0x30      ; WM_SETFONT
-        , "ptr", DllCall("CreateFontIndirectW", "ptr", lf.Ptr, "ptr"), "ptr", 1)
+        , "ptr", hFont, "ptr", 1)
     return hwnd
 }
 
@@ -671,6 +680,11 @@ CloseTextToolBatch(batch) {
             batch.View.Destroy()
         }
         batch.Gui.Destroy()
+        ; Only now: deleting a font a live control still uses is undefined.
+        if batch.HasOwnProp("BodyFont")
+            DllCall("DeleteObject", "ptr", batch.BodyFont)
+        if batch.HasOwnProp("SmallFont")
+            DllCall("DeleteObject", "ptr", batch.SmallFont)
         if TextToolBatches.Has(batch.Hwnd)
             TextToolBatches.Delete(batch.Hwnd)
     } finally {

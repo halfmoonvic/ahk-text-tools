@@ -8,9 +8,8 @@
 # New-AnthropicMessagesRequest <Config> <Prompt>
 #   Build the URL, JSON body, and headers for one streaming request.
 #
-#   Thinking mode replaces temperature with a token budget: the API rejects
-#   both together, and max_tokens must leave room for the answer on top of the
-#   thinking budget.
+#   Thinking mode needs max_tokens to leave room for the answer on top of the
+#   thinking budget, so both are raised together.
 # ---------------------------------------------------------------------------
 function New-AnthropicMessagesRequest($Config, [string] $Prompt) {
     # baseUrl may be given with or without the /v1 prefix.
@@ -31,9 +30,7 @@ function New-AnthropicMessagesRequest($Config, [string] $Prompt) {
         stream = $true
     }
 
-    if ($Config.Thinking -eq 'off') {
-        $body['temperature'] = $Config.Temperature
-    } else {
+    if ($Config.Thinking -ne 'off') {
         $budget = @{ low = 1024; medium = 4096; high = 8192 }[$Config.Thinking]
         $body['max_tokens'] = $budget + 4096
         $body['thinking'] = @{ type = 'enabled'; budget_tokens = $budget }

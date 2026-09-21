@@ -30,7 +30,6 @@ function New-OpenAIResponsesRequest($Config, [string] $Prompt) {
         model = $Config.Model
         instructions = $Config.SystemPrompt
         input = $Prompt
-        temperature = $Config.Temperature
         reasoning = @{ effort = $effort }
         stream = $true
         store = $false

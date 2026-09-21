@@ -30,7 +30,6 @@ function New-OpenAICompletionsRequest($Config, [string] $Prompt) {
             @{ role = 'system'; content = $Config.SystemPrompt },
             @{ role = 'user'; content = $Prompt }
         )
-        temperature = $Config.Temperature
         reasoning_effort = $effort
         stream = $true
     }

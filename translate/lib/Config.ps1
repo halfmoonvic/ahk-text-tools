@@ -223,14 +223,6 @@ function Get-TranslateConfig([string] $ModelOverride) {
         throw "invalid API key for provider '$providerName'"
     }
 
-    # Kept as a JSON node so the original numeric token reaches the API intact.
-    $temperature = Get-JsonMember $model 'temperature'
-    if ($null -eq $temperature) {
-        $temperature = ConvertFrom-StrictJson '0.2'
-    } elseif ($temperature.Kind -ne 'number') {
-        throw "invalid temperature for model '$selected': expected JSON number"
-    }
-
     $thinkingNode = Get-JsonMember (Get-JsonMember $settings 'modelThinkingLevels') $selected
     if ($null -eq $thinkingNode) {
         $thinkingNode = Get-JsonMember $settings 'defaultThinkingLevel'
@@ -265,7 +257,6 @@ function Get-TranslateConfig([string] $ModelOverride) {
         Api          = $api
         BaseUrl      = $base
         ApiKey       = $key
-        Temperature  = $temperature
         Thinking     = $thinking
         Threshold    = $common.Threshold
         SystemPrompt = $systemPrompt

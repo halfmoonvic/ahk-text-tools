@@ -119,9 +119,11 @@ ParseTextToolBoolean(value, fallback) {
 
 StartTextToolBatch(title, scriptName, engines, text, config) {
     Critical "On"
-    batch := 0
+    ; Created here, not by CreateTextToolWindow, so a window that fails partway
+    ; through construction can still be closed.
+    batch := {Tasks: [], Open: true}
     try {
-        batch := CreateTextToolWindow(title, scriptName, engines, config)
+        CreateTextToolWindow(batch, title, scriptName, engines, config)
         CreateTextToolRows(batch, engines)
         popupWidth := Round(batch.Ui.Width * batch.Scale)
         popupHeight := ClampPopupHeight(batch, batch.RowHeight * engines.Length + 24)
@@ -133,7 +135,7 @@ StartTextToolBatch(title, scriptName, engines, text, config) {
         InitializeTextToolInput(batch, text)
         return batch
     } catch as err {
-        if batch && batch.HasOwnProp("Gui")
+        if batch.HasOwnProp("Gui")
             CloseTextToolBatch(batch)
         ShowStaticPopup(title, err.Message)
     } finally {
@@ -141,10 +143,10 @@ StartTextToolBatch(title, scriptName, engines, text, config) {
     }
 }
 
-CreateTextToolWindow(title, scriptName, engines, config) {
+CreateTextToolWindow(batch, title, scriptName, engines, config) {
     global TextToolBatches, TextToolViews
-    batch := {Tasks: [], Open: true, Scroll: 0, Current: 0, ScriptName: scriptName,
-        Engines: engines, HeaderHeight: 0, UserSized: false, AutoHeight: 0}
+    batch.Scroll := 0, batch.Current := 0, batch.ScriptName := scriptName, batch.Engines := engines
+    batch.HeaderHeight := 0, batch.UserSized := false, batch.AutoHeight := 0
     batch.Ui := GetPopupUiConfig(config)
     windowFlags := batch.Ui.AlwaysOnTop ? "+AlwaysOnTop " : ""
     batch.Gui := Gui(windowFlags "+Resize -DPIScale +MinSize420x240", title)
@@ -164,7 +166,6 @@ CreateTextToolWindow(title, scriptName, engines, config) {
     batch.Gui.OnEvent("Close", (*) => CloseTextToolBatch(batch))
     batch.Gui.OnEvent("Escape", (*) => CloseTextToolBatch(batch))
     batch.Gui.OnEvent("Size", (guiObj, minMax, width, height) => LayoutTextTools(batch, width, height))
-    return batch
 }
 
 CreateTextToolHeader(batch) {

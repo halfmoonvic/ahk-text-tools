@@ -7,6 +7,7 @@
         "anthropic/claude-opus-5": "off",
         "deepseek/deepseek-v4-flash": "off"
     },
+    "connectTimeoutSeconds": 10,
     "proxy": {
         "http": "http://127.0.0.1:7890",
         "https": "http://127.0.0.1:7890",

@@ -109,10 +109,15 @@ where `provider` matches a key in `models.json`.
 | --- | --- |
 | `auth.json` | API keys, one per provider. **Never commit this.** |
 | `models.json` | Providers, their base URLs, API flavour, and models |
-| `config.json` | Default model, proxy, language-detection threshold, system prompt |
+| `config.json` | Default model, proxy, connection timeout, language-detection threshold, system prompt |
 
 `api` in `models.json` must be one of `openai-completions`,
 `openai-responses`, or `anthropic-messages`.
+
+`connectTimeoutSeconds` in `config.json` (a positive integer, default 10)
+limits only connecting to the provider — the DNS lookup and the TCP and TLS
+handshakes. It does not limit how long a response may take. The `google`
+engine does not use it.
 
 Set `TRANSLATE_CONFIG_DIR` to point the translator at a different directory —
 useful for testing without disturbing your real keys. It affects only the

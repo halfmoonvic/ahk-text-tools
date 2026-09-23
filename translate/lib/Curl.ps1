@@ -291,6 +291,8 @@ function Invoke-CurlSse($Config, $Request, [string] $OutputFile, [Threading.Canc
         $state = New-TranslationStream $writer $Config.Api
         $arguments = @(
             '--disable',
+            # Only the connection phase is bounded: a total limit would cut off long thinking responses.
+            '--connect-timeout', [string]$Config.ConnectTimeout,
             '--silent',
             '--show-error',
             '--no-buffer',
@@ -371,6 +373,11 @@ function Invoke-CurlSse($Config, $Request, [string] $OutputFile, [Threading.Canc
             }
 
             [void]$stderrTask.GetAwaiter().GetResult()
+            # 28 can only come from --connect-timeout while no other time limit is passed.
+            if ($process.ExitCode -eq 28) {
+                throw "$($Config.Api): connection timed out after $($Config.ConnectTimeout)s"
+            }
+
             if ($process.ExitCode -ne 0) {
                 throw "$($Config.Api): HTTP/network request failed (curl exit code $($process.ExitCode))"
             }

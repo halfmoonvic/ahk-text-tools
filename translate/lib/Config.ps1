@@ -248,16 +248,28 @@ function Get-TranslateConfig([string] $ModelOverride) {
 
     $proxyUrl = Get-TranslateProxy $settings $providerName $uri.Scheme
 
+    $timeoutNode = Get-JsonMember $settings 'connectTimeoutSeconds'
+    $connectTimeout = 10
+    if ($null -ne $timeoutNode) {
+        if ($timeoutNode.Kind -ne 'number' -or
+            $timeoutNode.Value -cnotmatch '\A[1-9][0-9]{0,5}\z') {
+            throw 'connectTimeoutSeconds must be a positive integer'
+        }
+
+        $connectTimeout = [int]$timeoutNode.Value
+    }
+
     return [pscustomobject]@{
-        Provider     = $providerName
-        Model        = $modelName
-        Api          = $api
-        BaseUrl      = $base
-        ApiKey       = $key
-        Thinking     = $thinking
-        Threshold    = $common.Threshold
-        SystemPrompt = $systemPrompt
-        Proxy        = $proxyUrl
+        Provider       = $providerName
+        Model          = $modelName
+        Api            = $api
+        BaseUrl        = $base
+        ApiKey         = $key
+        Thinking       = $thinking
+        Threshold      = $common.Threshold
+        SystemPrompt   = $systemPrompt
+        Proxy          = $proxyUrl
+        ConnectTimeout = $connectTimeout
     }
 }
 

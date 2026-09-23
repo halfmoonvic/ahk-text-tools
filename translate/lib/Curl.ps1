@@ -74,8 +74,9 @@ function Stop-TranslateProcess($Process) {
 
 # ---------------------------------------------------------------------------
 # Get-SystemCurl
-#   Return the path to the Windows-bundled curl.exe, verifying it is new
-#   enough. 7.76.0 is the floor because --fail-with-body arrived there.
+#   Return the path to the Windows-bundled curl.exe. It must be 7.76.0 or
+#   newer for --fail-with-body; an older one rejects that option at request
+#   time, which Invoke-CurlSse reports through exit code 2.
 #
 #   Resolved through Sysnative for a 32-bit process on 64-bit Windows, which
 #   would otherwise be redirected to the 32-bit System32.
@@ -89,27 +90,7 @@ function Get-SystemCurl {
         }
     $path = Join-Path $systemDirectory 'curl.exe'
     if (-not [IO.File]::Exists($path)) {
-        throw "system curl missing: $path; actual version: unavailable; required: >= 7.76.0"
-    }
-
-    $process = New-CurlProcess $path @('--disable', '--version')
-    try {
-        [void]$process.Start()
-        $stdout = $process.StandardOutput.ReadToEndAsync()
-        $stderr = $process.StandardError.ReadToEndAsync()
-        while (-not $process.WaitForExit(20)) { }
-        $versionText = $stdout.GetAwaiter().GetResult()
-        [void]$stderr.GetAwaiter().GetResult()
-        if ($process.ExitCode -ne 0 -or $versionText -notmatch '^curl (\d+\.\d+\.\d+)') {
-            throw "cannot identify system curl version: $path; actual version: unknown; required: >= 7.76.0"
-        }
-
-        $actual = $Matches[1]
-        if ([version]$actual -lt [version]'7.76.0') {
-            throw "system curl too old: $path; actual version: $actual; required: >= 7.76.0"
-        }
-    } finally {
-        Stop-TranslateProcess $process
+        throw "system curl missing: $path"
     }
 
     return $path
@@ -376,6 +357,10 @@ function Invoke-CurlSse($Config, $Request, [string] $OutputFile, [Threading.Canc
             # 28 can only come from --connect-timeout while no other time limit is passed.
             if ($process.ExitCode -eq 28) {
                 throw "$($Config.Api): connection timed out after $($Config.ConnectTimeout)s"
+            }
+
+            if ($process.ExitCode -eq 2) {
+                throw "$($Config.Api): curl rejected its arguments (exit code 2); system curl may be older than 7.76.0"
             }
 
             if ($process.ExitCode -ne 0) {

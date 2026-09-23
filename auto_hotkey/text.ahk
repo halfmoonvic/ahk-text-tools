@@ -1165,7 +1165,7 @@ CloseStaticTextPopup(popup) {
     popup.Destroy()
 }
 
-; Not HOME: Git Bash sets it to a POSIX path Windows cannot resolve.
+; Not HOME: it is not a Windows convention and may differ from USERPROFILE.
 GetConfigRoot() {
     return EnvGet("USERPROFILE") "\.config"
 }

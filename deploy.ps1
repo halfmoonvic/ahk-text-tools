@@ -18,13 +18,12 @@
     Pull the latest commits, then deploy.
 
 .EXAMPLE
-    .\deploy.ps1 -TargetDir D:\tools\text-tools -ConfigDir D:\tools\config
-    Install somewhere else entirely.
+    .\deploy.ps1 -TargetDir D:\tools\text-tools
+    Install the program files elsewhere; configuration still goes to ~\.config.
 #>
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
     [string] $TargetDir = (Join-Path $env:USERPROFILE '.local\bin'),
-    [string] $ConfigDir = (Join-Path $env:USERPROFILE '.config'),
     [switch] $Update,
     [switch] $SkipVendor,
     [switch] $Force
@@ -45,6 +44,8 @@ if ($PSVersionTable.PSVersion.Major -lt 6) {
 }
 
 $RepoRoot = $PSScriptRoot
+# Not a parameter: text.ahk, kana.ps1 and translate read configuration only from here.
+$ConfigDir = Join-Path $env:USERPROFILE '.config'
 $script:Stats = [ordered]@{ Created = 0; Updated = 0; Unchanged = 0; Skipped = 0 }
 $script:Warnings = [Collections.Generic.List[string]]::new()
 

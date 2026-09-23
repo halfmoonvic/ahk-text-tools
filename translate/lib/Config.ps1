@@ -1,8 +1,7 @@
 # Config.ps1 - Loading and validating the three translate configuration files.
 #
 # Dot-sourced by Translate.Core.psm1. Configuration lives in one directory
-# resolved from TRANSLATE_CONFIG_DIR, then XDG_CONFIG_HOME, then
-# %USERPROFILE%\.config:
+# resolved from TRANSLATE_CONFIG_DIR, then %USERPROFILE%\.config\translate:
 #   config.json  general settings, model selection, proxy, system prompt
 #   auth.json    API key per provider
 #   models.json  provider endpoints and their model lists
@@ -61,8 +60,6 @@ function Get-TranslateCommonConfig {
     $directory =
         if ($env:TRANSLATE_CONFIG_DIR) {
             $env:TRANSLATE_CONFIG_DIR
-        } elseif ($env:XDG_CONFIG_HOME) {
-            Join-Path $env:XDG_CONFIG_HOME 'translate'
         } else {
             # Not the automatic $HOME: it resolves separately and would drift.
             Join-Path $env:USERPROFILE '.config\translate'

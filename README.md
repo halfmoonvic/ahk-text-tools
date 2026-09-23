@@ -49,7 +49,6 @@ Re-run it any time; it only writes what actually changed.
 | Option | Effect |
 | --- | --- |
 | `-TargetDir <path>` | Where program files go (default `~\.local\bin`) |
-| `-ConfigDir <path>` | Where configuration goes (default `~\.config`) |
 | `-Update` | `git pull --ff-only` first, then deploy |
 | `-SkipVendor` | Don't download the Japanese dictionary data |
 | `-Force` | Overwrite customised config (backs it up first) and re-download vendor files |
@@ -71,6 +70,9 @@ Updating later:
 ```
 
 ## Configuration
+
+All configuration lives under `%USERPROFILE%\.config` (written `~\.config`
+below). This location is fixed.
 
 ### `~\.config\ahk\settings.json`
 
@@ -113,7 +115,8 @@ where `provider` matches a key in `models.json`.
 `openai-responses`, or `anthropic-messages`.
 
 Set `TRANSLATE_CONFIG_DIR` to point the translator at a different directory —
-useful for testing without disturbing your real keys.
+useful for testing without disturbing your real keys. It affects only the
+translator; the AutoHotkey front-end and the kana tool do not read it.
 
 ## Command line
 

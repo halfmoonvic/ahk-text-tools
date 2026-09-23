@@ -311,7 +311,7 @@ function ConvertTo-JsonString([AllowEmptyString()][string] $Text) {
 # ConvertTo-StrictJson <Value>
 #   Serialize a hashtable, array, string, bool, integer, or TranslateJsonNode
 #   to compact JSON. A number node is emitted as its original token, so a
-#   temperature read as 0.2 is not re-rendered as 0.20000000000000001.
+#   value read as 1.50 or 1e3 is written back exactly as it appeared.
 # ---------------------------------------------------------------------------
 function ConvertTo-StrictJson($Value) {
     if ($null -eq $Value) {

@@ -334,7 +334,7 @@ function Install-KanaVendor {
         }
     } catch {
         Write-Warn "could not install kana vendor files: $($_.Exception.Message)"
-        Write-Warn 'Japanese kana annotation (Ctrl+Win+S) will be unavailable; translation is unaffected.'
+        Write-Warn 'Japanese kana annotation (Win+Alt+S by default) will be unavailable; translation is unaffected.'
     } finally {
         Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue
     }
@@ -511,7 +511,7 @@ Write-Host 'Next steps:' -ForegroundColor White
 Write-Host "  1. Add your API keys to $authPath"
 Write-Host "     (not needed if you only use the free 'google' engine)"
 Write-Host "  2. Run $entryPoint"
-Write-Host '  3. Select text anywhere, then press Ctrl+Win+A to translate or Ctrl+Win+S for kana'
+Write-Host '  3. Select text anywhere, then press Win+Alt+A to translate or Win+Alt+S for kana (the defaults)'
 Write-Host ''
 
 #endregion

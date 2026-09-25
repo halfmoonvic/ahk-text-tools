@@ -3,10 +3,12 @@
 Select text anywhere in Windows, press a hotkey, and get a translation — or a
 Japanese reading — in a popup that follows your system light/dark theme.
 
-| Hotkey | Action |
+| Default hotkey | Action |
 | --- | --- |
-| <kbd>Ctrl</kbd>+<kbd>Win</kbd>+<kbd>A</kbd> | Translate the selection (one panel per configured engine) |
-| <kbd>Ctrl</kbd>+<kbd>Win</kbd>+<kbd>S</kbd> | Annotate Japanese text with kana / furigana |
+| <kbd>Win</kbd>+<kbd>Alt</kbd>+<kbd>A</kbd> | Translate the selection (one panel per configured engine) |
+| <kbd>Win</kbd>+<kbd>Alt</kbd>+<kbd>S</kbd> | Annotate Japanese text with kana / furigana |
+
+Both hotkeys can be changed or disabled in [`settings.json`](#configahksettingsjson).
 
 The translate popup also has a text box, so you can keep typing new phrases
 without re-selecting anything. Results stream in as they arrive, each engine in
@@ -37,7 +39,7 @@ dictionary data, and writes starter configuration to `~\.config`. Then:
 1. If you want AI translation, put your API keys in `~\.config\translate\auth.json`.
    Skip this if you only use the free `google` engine.
 2. Run `~\.local\bin\auto_hotkey\text.ahk`.
-3. Select some text and press <kbd>Ctrl</kbd>+<kbd>Win</kbd>+<kbd>A</kbd>.
+3. Select some text and press <kbd>Win</kbd>+<kbd>Alt</kbd>+<kbd>A</kbd> (the default).
 
 To start it automatically, put a shortcut to `text.ahk` in your Startup folder
 (<kbd>Win</kbd>+<kbd>R</kbd> → `shell:startup`).
@@ -81,6 +83,10 @@ Read by the AutoHotkey front-end.
 ```jsonc
 {
   "translate": ["google", "openai/gpt-5.6-sol"],  // one panel per entry
+  "hotkeys": {
+    "translate": "#!a",         // Win+Alt+A
+    "kana": "#!s"               // null or "" disables it
+  },
   "ui": {
     "theme": "auto",            // auto | light | dark
     "alwaysOnTop": false,
@@ -98,6 +104,16 @@ Read by the AutoHotkey front-end.
 
 Each `translate` entry is either `google` (free, no key) or `provider/model`,
 where `provider` matches a key in `models.json`.
+
+`hotkeys` values use AutoHotkey v2 [hotkey syntax](https://www.autohotkey.com/docs/v2/Hotkeys.htm):
+`#` is Win, `!` Alt, `^` Ctrl and `+` Shift, so `#!a` is <kbd>Win</kbd>+<kbd>Alt</kbd>+<kbd>A</kbd>;
+`!q` and `CapsLock & t` also work. Friendly forms like `Win+Alt+A` do not.
+Set an action to `null` or `""` to disable it; a missing action keeps its
+default. The hotkeys are read once at startup, so after editing them choose
+**Reload Script** from the tray menu or run `text.ahk` again. A mistake is
+reported in a popup at startup, and that action stays off rather than falling
+back to its default; the other hotkey keeps working. Hotkeys are global and
+take over the key combination from every other program.
 
 `japanese.kana.to` picks the reading script — `hiragana`, `katakana`, or
 `romaji`. `mode` is `ruby` for HTML `<ruby>` markup, or anything else

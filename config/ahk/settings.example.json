@@ -1,5 +1,9 @@
 {
     "translate": ["google"],
+    "hotkeys": {
+        "translate": "#!a",
+        "kana": "#!s"
+    },
     "ui": {
         "alwaysOnTop": false,
         "theme": "auto",

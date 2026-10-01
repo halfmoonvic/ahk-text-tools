@@ -1,17 +1,17 @@
 # OpenAIResponses.ps1 - Request building and event handling for the OpenAI
 # Responses API.
 #
-# Dot-sourced by Translate.Core.psm1 and selected when a provider declares
+# Dot-sourced by Llm.Core.psm1 and selected when a provider declares
 # api = 'openai-responses' in models.json.
 
 # ---------------------------------------------------------------------------
-# New-OpenAIResponsesRequest <Config> <Prompt>
+# New-OpenAIResponsesRequest <Config> <SystemPrompt> <Prompt>
 #   Build the URL, JSON body, and headers for one streaming request.
 #
 #   store = false keeps the prompt from being retained server-side, since
-#   translated text is the user's own content.
+#   the prompt is the user's own content.
 # ---------------------------------------------------------------------------
-function New-OpenAIResponsesRequest($Config, [string] $Prompt) {
+function New-OpenAIResponsesRequest($Config, [string] $SystemPrompt, [string] $Prompt) {
     # baseUrl may already name the endpoint, so append only when needed.
     $endpoint = $Config.BaseUrl.TrimEnd('/')
     if (-not $endpoint.EndsWith('/responses', [StringComparison]::Ordinal)) {
@@ -28,7 +28,7 @@ function New-OpenAIResponsesRequest($Config, [string] $Prompt) {
 
     $body = [ordered]@{
         model = $Config.Model
-        instructions = $Config.SystemPrompt
+        instructions = $SystemPrompt
         input = $Prompt
         reasoning = @{ effort = $effort }
         stream = $true
@@ -55,7 +55,7 @@ function Receive-OpenAIResponsesEvent($State, $Node) {
     switch -CaseSensitive ($type) {
         'response.failed' { Set-StreamFailure $State 'response.failed' }
         'response.incomplete' { Set-StreamFailure $State 'response.incomplete' }
-        'response.output_text.delta' { Write-TranslationDelta $State (Get-JsonMember $Node 'delta') }
-        'response.completed' { Complete-TranslationStream $State }
+        'response.output_text.delta' { Write-LlmDelta $State (Get-JsonMember $Node 'delta') }
+        'response.completed' { Complete-LlmStream $State }
     }
 }

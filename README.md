@@ -169,9 +169,12 @@ text-tools/
 │   ├── run-batch.ps1       <- runs all translate engines in one process
 │   └── run-task.ps1        <- wraps the kana child process
 ├── common/                 <- JSON, child process and config helpers
+├── llm/                    <- streams a prompt through a configured model
+│   ├── Llm.Core.psm1
+│   └── lib/, adapters/
 ├── translate/              <- translation engine
 │   ├── Translate.Core.psm1
-│   ├── lib/, adapters/
+│   ├── lib/
 │   └── google              <- third-party, see THIRD_PARTY.md
 └── kana/
     ├── kana.mjs

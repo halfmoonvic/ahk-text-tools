@@ -1,15 +1,15 @@
 # OpenAICompletions.ps1 - Request building and event handling for the OpenAI
 # Chat Completions API.
 #
-# Dot-sourced by Translate.Core.psm1 and selected when a provider declares
+# Dot-sourced by Llm.Core.psm1 and selected when a provider declares
 # api = 'openai-completions' in models.json. Also used by OpenAI-compatible
 # third-party endpoints such as DeepSeek.
 
 # ---------------------------------------------------------------------------
-# New-OpenAICompletionsRequest <Config> <Prompt>
+# New-OpenAICompletionsRequest <Config> <SystemPrompt> <Prompt>
 #   Build the URL, JSON body, and headers for one streaming request.
 # ---------------------------------------------------------------------------
-function New-OpenAICompletionsRequest($Config, [string] $Prompt) {
+function New-OpenAICompletionsRequest($Config, [string] $SystemPrompt, [string] $Prompt) {
     # baseUrl may already name the endpoint, so append only when needed.
     $endpoint = $Config.BaseUrl.TrimEnd('/')
     if (-not $endpoint.EndsWith('/chat/completions', [StringComparison]::Ordinal)) {
@@ -27,7 +27,7 @@ function New-OpenAICompletionsRequest($Config, [string] $Prompt) {
     $body = [ordered]@{
         model = $Config.Model
         messages = @(
-            @{ role = 'system'; content = $Config.SystemPrompt },
+            @{ role = 'system'; content = $SystemPrompt },
             @{ role = 'user'; content = $Prompt }
         )
         reasoning_effort = $effort
@@ -59,7 +59,7 @@ function Receive-OpenAICompletionsEvent($State, $Node) {
     }
 
     $choice = $choices.Value[0]
-    Write-TranslationDelta $State (Get-JsonMember (Get-JsonMember $choice 'delta') 'content')
+    Write-LlmDelta $State (Get-JsonMember (Get-JsonMember $choice 'delta') 'content')
 
     # Absent, null, and empty all mean "not finished yet".
     $reason = Get-JsonMember $choice 'finish_reason'

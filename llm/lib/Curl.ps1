@@ -1,10 +1,10 @@
 # Curl.ps1 - Running the streaming HTTP request through the system curl.exe.
 #
-# Dot-sourced by Translate.Core.psm1. The AI adapters build a request here and
+# Dot-sourced by Llm.Core.psm1. The adapters build a request and
 # Invoke-CurlSse streams the response through Sse.ps1 to the output writer.
 #
 # Why curl rather than .NET HTTP: Windows PowerShell 5.1's stack cannot stream a
-# response body incrementally, so translations would only appear once complete.
+# response body incrementally, so text would only appear once complete.
 #
 # Each request gets its own temporary directory named with the owning process id
 # and start time. Body and headers are passed as @files so credentials never
@@ -35,17 +35,17 @@ function Get-SystemCurl {
 }
 
 # ---------------------------------------------------------------------------
-# Remove-TranslateTempDirectory <Directory>
+# Remove-LlmTempDirectory <Directory>
 #   Delete one request directory, refusing anything that is not a direct child
 #   of the temp root matching our own naming pattern. This runs with -Recurse
 #   -Force, so the guard is what keeps a bad caller from deleting elsewhere.
 # ---------------------------------------------------------------------------
-function Remove-TranslateTempDirectory([string] $Directory) {
+function Remove-LlmTempDirectory([string] $Directory) {
     $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'
     $full = [IO.Path]::GetFullPath($Directory)
     if (-not $full.StartsWith($tempRoot, [StringComparison]::OrdinalIgnoreCase) -or
         [IO.Path]::GetDirectoryName($full) -ne $tempRoot.TrimEnd('\') -or
-        [IO.Path]::GetFileName($full) -notmatch '^translate-request-\d+-\d+-[a-f0-9]{32}$') {
+        [IO.Path]::GetFileName($full) -notmatch '^llm-request-\d+-\d+-[a-f0-9]{32}$') {
         throw 'refusing to remove unrecognized temporary directory'
     }
 
@@ -55,7 +55,7 @@ function Remove-TranslateTempDirectory([string] $Directory) {
 }
 
 # ---------------------------------------------------------------------------
-# Clear-StaleTranslateRequests
+# Clear-StaleLlmRequests
 #   Remove request directories left behind by runs that were killed before
 #   their finally block could clean up. A directory is only removed once its
 #   owner is confirmed gone; a still-running curl child is stopped first.
@@ -63,9 +63,9 @@ function Remove-TranslateTempDirectory([string] $Directory) {
 #   Reparse points are skipped so a planted symlink cannot redirect the
 #   delete. Failures are ignored: cleanup must never break a new request.
 # ---------------------------------------------------------------------------
-function Clear-StaleTranslateRequests {
-    foreach ($directory in Get-ChildItem -LiteralPath ([IO.Path]::GetTempPath()) -Directory -Filter 'translate-request-*' -ErrorAction SilentlyContinue) {
-        if ($directory.Name -notmatch '^translate-request-(\d+)-(\d+)-[a-f0-9]{32}$' -or
+function Clear-StaleLlmRequests {
+    foreach ($directory in Get-ChildItem -LiteralPath ([IO.Path]::GetTempPath()) -Directory -Filter 'llm-request-*' -ErrorAction SilentlyContinue) {
+        if ($directory.Name -notmatch '^llm-request-(\d+)-(\d+)-[a-f0-9]{32}$' -or
             ($directory.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
             continue
         }
@@ -91,7 +91,7 @@ function Clear-StaleTranslateRequests {
                 }
             }
 
-            Remove-TranslateTempDirectory $directory.FullName
+            Remove-LlmTempDirectory $directory.FullName
         } catch {
             # Inaccessible process identity or files: leave them untouched.
         }
@@ -143,7 +143,7 @@ function Get-CurlHttpStatus([string] $HeaderFile) {
 
 # ---------------------------------------------------------------------------
 # Invoke-CurlSse <Config> <Request> <OutputFile> [<CancellationToken>]
-#   Run the streaming request and write the translation to OutputFile, or to
+#   Run the streaming request and write the response text to OutputFile, or to
 #   stdout when OutputFile is empty. Throws on any HTTP, network, or protocol
 #   failure; returns normally only once the stream completes cleanly.
 #
@@ -152,7 +152,7 @@ function Get-CurlHttpStatus([string] $HeaderFile) {
 #   running after the user cancelled.
 # ---------------------------------------------------------------------------
 function Invoke-CurlSse($Config, $Request, [string] $OutputFile, [Threading.CancellationToken] $CancellationToken = [Threading.CancellationToken]::None) {
-    Clear-StaleTranslateRequests
+    Clear-StaleLlmRequests
     $executable = Get-SystemCurl
     $directory = $null
     $process = $null
@@ -165,7 +165,7 @@ function Invoke-CurlSse($Config, $Request, [string] $OutputFile, [Threading.Canc
         $owner = [Diagnostics.Process]::GetCurrentProcess()
         try {
             $directory = Join-Path ([IO.Path]::GetTempPath()) (
-                "translate-request-$PID-$($owner.StartTime.ToUniversalTime().Ticks)-" +
+                "llm-request-$PID-$($owner.StartTime.ToUniversalTime().Ticks)-" +
                 [guid]::NewGuid().ToString('N'))
         } finally {
             $owner.Dispose()
@@ -187,7 +187,7 @@ function Invoke-CurlSse($Config, $Request, [string] $OutputFile, [Threading.Canc
             $writer = [IO.StreamWriter]::new([Console]::OpenStandardOutput(), $utf8, 1024, $true)
         }
 
-        $state = New-TranslationStream $writer $Config.Api
+        $state = New-LlmStream $writer $Config.Api
         $arguments = @(
             '--disable',
             # Only the connection phase is bounded: a total limit would cut off long thinking responses.
@@ -236,7 +236,7 @@ function Invoke-CurlSse($Config, $Request, [string] $OutputFile, [Threading.Canc
             }
 
             # Wait for the status before consuming the body, so an error
-            # response is never parsed as translation content.
+            # response is never parsed as response text.
             if ($readTask.IsCompleted -and ($status -ne 0 -or $process.HasExited)) {
                 $count = $readTask.GetAwaiter().GetResult()
                 if ($count -eq 0) {
@@ -289,7 +289,7 @@ function Invoke-CurlSse($Config, $Request, [string] $OutputFile, [Threading.Canc
         }
     } finally {
         # A stream still 'receiving' here was cancelled; mark it failed so the
-        # writer is not mistaken for a completed translation.
+        # writer is not mistaken for a completed response.
         if ($null -ne $state -and $state.Status -eq 'receiving') {
             $state.Status = 'failure'
         }
@@ -309,7 +309,7 @@ function Invoke-CurlSse($Config, $Request, [string] $OutputFile, [Threading.Canc
                 }
 
                 if ($null -ne $directory) {
-                    Remove-TranslateTempDirectory $directory
+                    Remove-LlmTempDirectory $directory
                 }
             }
         }

@@ -1,17 +1,17 @@
 # AnthropicMessages.ps1 - Request building and event handling for the Anthropic
 # Messages API.
 #
-# Dot-sourced by Translate.Core.psm1 and selected when a provider declares
+# Dot-sourced by Llm.Core.psm1 and selected when a provider declares
 # api = 'anthropic-messages' in models.json.
 
 # ---------------------------------------------------------------------------
-# New-AnthropicMessagesRequest <Config> <Prompt>
+# New-AnthropicMessagesRequest <Config> <SystemPrompt> <Prompt>
 #   Build the URL, JSON body, and headers for one streaming request.
 #
 #   Thinking mode needs max_tokens to leave room for the answer on top of the
 #   thinking budget, so both are raised together.
 # ---------------------------------------------------------------------------
-function New-AnthropicMessagesRequest($Config, [string] $Prompt) {
+function New-AnthropicMessagesRequest($Config, [string] $SystemPrompt, [string] $Prompt) {
     # baseUrl may be given with or without the /v1 prefix.
     $endpoint = $Config.BaseUrl.TrimEnd('/')
     if ($endpoint.EndsWith('/v1/messages', [StringComparison]::Ordinal)) {
@@ -25,7 +25,7 @@ function New-AnthropicMessagesRequest($Config, [string] $Prompt) {
     $body = [ordered]@{
         model = $Config.Model
         max_tokens = 4096
-        system = $Config.SystemPrompt
+        system = $SystemPrompt
         messages = @(@{ role = 'user'; content = $Prompt })
         stream = $true
     }
@@ -64,7 +64,7 @@ function Receive-AnthropicMessagesEvent($State, $Node) {
     # are deliberately not written to the output.
     if ($type -ceq 'content_block_delta' -and
         (Get-JsonString (Get-JsonMember $delta 'type')) -ceq 'text_delta') {
-        Write-TranslationDelta $State (Get-JsonMember $delta 'text')
+        Write-LlmDelta $State (Get-JsonMember $delta 'text')
     }
 
     if ($type -ceq 'message_delta') {
@@ -83,7 +83,7 @@ function Receive-AnthropicMessagesEvent($State, $Node) {
         if (-not $State.Finished) {
             Set-StreamFailure $State 'message_stop without accepted stop_reason'
         } else {
-            Complete-TranslationStream $State
+            Complete-LlmStream $State
         }
     }
 }

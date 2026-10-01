@@ -1,6 +1,6 @@
-# Sse.ps1 - Server-sent-event parsing and translation stream state.
+# Sse.ps1 - Server-sent-event parsing and response stream state.
 #
-# Dot-sourced by Translate.Core.psm1. Receive-SseChunk is fed raw curl stdout and
+# Dot-sourced by Llm.Core.psm1. Receive-SseChunk is fed raw curl stdout and
 # drives the chain chunk -> line -> event -> per-protocol handler in the adapters.
 #
 # Stream state:
@@ -9,13 +9,13 @@
 #   recorded once and later events in the same stream cannot overwrite it.
 
 # ---------------------------------------------------------------------------
-# New-TranslationStream <Writer> <Protocol>
+# New-LlmStream <Writer> <Protocol>
 #   Create the mutable state bag shared by the SSE reader and the adapters.
 #   Seen tracks whether any content arrived; Finished tracks whether the
 #   protocol signalled an acceptable end, so a truncated stream is not
 #   reported as success.
 # ---------------------------------------------------------------------------
-function New-TranslationStream($Writer, [string] $Protocol) {
+function New-LlmStream($Writer, [string] $Protocol) {
     return @{
         Status   = 'receiving'
         Error    = ''
@@ -42,11 +42,11 @@ function Set-StreamFailure($State, [string] $Message) {
 }
 
 # ---------------------------------------------------------------------------
-# Write-TranslationDelta <State> <Node>
+# Write-LlmDelta <State> <Node>
 #   Write one text delta straight through to the output writer. Flushed per
-#   delta so translations stream to the caller instead of arriving at once.
+#   delta so text streams to the caller instead of arriving at once.
 # ---------------------------------------------------------------------------
-function Write-TranslationDelta($State, $Node) {
+function Write-LlmDelta($State, $Node) {
     if ($State.Status -ne 'receiving' -or $null -eq $Node -or
         $Node.Kind -ne 'string' -or $Node.Value.Length -eq 0) {
         return
@@ -58,17 +58,17 @@ function Write-TranslationDelta($State, $Node) {
 }
 
 # ---------------------------------------------------------------------------
-# Complete-TranslationStream <State>
+# Complete-LlmStream <State>
 #   Close a stream that ended normally. An end with no content is a failure:
-#   the caller must not treat an empty translation as a valid result.
+#   the caller must not treat an empty response as a valid result.
 # ---------------------------------------------------------------------------
-function Complete-TranslationStream($State) {
+function Complete-LlmStream($State) {
     if ($State.Status -ne 'receiving') {
         return
     }
 
     if (-not $State.Seen) {
-        Set-StreamFailure $State 'completed without translation content'
+        Set-StreamFailure $State 'completed without content'
     } else {
         $State.Status = 'success'
     }
@@ -95,7 +95,7 @@ function Receive-SseEvent($State) {
             if (-not $State.Finished) {
                 Set-StreamFailure $State '[DONE] before finish_reason=stop'
             } else {
-                Complete-TranslationStream $State
+                Complete-LlmStream $State
             }
         }
         return

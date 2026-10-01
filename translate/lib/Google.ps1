@@ -45,7 +45,7 @@ function Get-GitBash {
 # ---------------------------------------------------------------------------
 function Invoke-GoogleTranslate([string] $Text, [string] $Target, [string] $OutputFile, $Common, [Threading.CancellationToken] $CancellationToken) {
     $bash = Get-GitBash
-    $proxy = Get-TranslateProxy $Common.Settings 'google' 'http' -HttpOnly
+    $proxy = Get-ProxyUrl $Common.Settings 'google' 'http' -HttpOnly
     $inputPath = [IO.Path]::GetTempFileName()
     $process = $null
     $writer = $null
@@ -62,7 +62,7 @@ function Invoke-GoogleTranslate([string] $Text, [string] $Target, [string] $Outp
 
         $launcher = Join-Path $PSScriptRoot 'google-launch.sh'
         $script = Join-Path (Split-Path $PSScriptRoot -Parent) 'google'
-        $process = New-CurlProcess $bash @(
+        $process = New-ChildProcess $bash @(
             '--noprofile',
             '--norc',
             $launcher.Replace('\', '/'),
@@ -128,7 +128,7 @@ function Invoke-GoogleTranslate([string] $Text, [string] $Target, [string] $Outp
     } finally {
         if ($null -ne $process -and $started) {
             if (-not $process.HasExited) {
-                $killer = New-CurlProcess (Join-Path $env:SystemRoot 'System32\taskkill.exe') @(
+                $killer = New-ChildProcess (Join-Path $env:SystemRoot 'System32\taskkill.exe') @(
                     '/PID',
                     [string]$process.Id,
                     '/T',
@@ -146,7 +146,7 @@ function Invoke-GoogleTranslate([string] $Text, [string] $Target, [string] $Outp
                 }
             }
 
-            Stop-TranslateProcess $process
+            Stop-ChildProcess $process
         } elseif ($null -ne $process) {
             $process.Dispose()
         }

@@ -13,7 +13,9 @@ $ErrorActionPreference = 'Stop'
 # Order matters: Json.ps1 defines the classes the rest parse against, and the
 # adapters must exist before Sse.ps1 dispatches to them.
 foreach ($file in @(
-    'lib/Json.ps1',
+    '../common/Json.ps1',
+    '../common/Process.ps1',
+    '../common/Config.ps1',
     'lib/Config.ps1',
     'lib/Sse.ps1',
     'adapters/OpenAICompletions.ps1',
@@ -60,7 +62,7 @@ function Invoke-Translate {
         }
 
         if ($OutputFile) {
-            $OutputFile = Resolve-TranslateFilePath $OutputFile
+            $OutputFile = Resolve-FileSystemPath $OutputFile
         }
 
         Invoke-GoogleTranslate $Text $Target $OutputFile $common $CancellationToken
@@ -89,7 +91,7 @@ function Invoke-Translate {
     }
 
     if ($OutputFile) {
-        $OutputFile = Resolve-TranslateFilePath $OutputFile
+        $OutputFile = Resolve-FileSystemPath $OutputFile
     }
 
     Invoke-CurlSse $config $request $OutputFile $CancellationToken

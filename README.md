@@ -168,6 +168,7 @@ text-tools/
 │   ├── json.ahk, proc.ahk  <- #Include'd by text.ahk
 │   ├── run-batch.ps1       <- runs all translate engines in one process
 │   └── run-task.ps1        <- wraps the kana child process
+├── common/                 <- JSON, child process and config helpers
 ├── translate/              <- translation engine
 │   ├── Translate.Core.psm1
 │   ├── lib/, adapters/

@@ -11,68 +11,6 @@
 # appear in a command line other processes can read.
 
 # ---------------------------------------------------------------------------
-# ConvertTo-WindowsArgument <Argument>
-#   Quote one argument for the Windows command line.
-# ---------------------------------------------------------------------------
-function ConvertTo-WindowsArgument([AllowEmptyString()][string] $Argument) {
-    # Microsoft CRT argv rules: backslashes only need doubling before quotes or
-    # before our closing quote. Always quoting also preserves empty arguments.
-    $quoted = [regex]::Replace($Argument, '(\\*)"', '$1$1\"')
-    $quoted = [regex]::Replace($quoted, '(\\+)$', '$1$1')
-    return '"' + $quoted + '"'
-}
-
-# ---------------------------------------------------------------------------
-# New-CurlProcess <Executable> <Arguments>
-#   Build a non-shell child process with UTF-8 redirected pipes. The caller
-#   starts it; this only prepares StartInfo.
-# ---------------------------------------------------------------------------
-function New-CurlProcess([string] $Executable, [string[]] $Arguments) {
-    $info = [Diagnostics.ProcessStartInfo]::new()
-    $info.FileName = $Executable
-    $info.Arguments = (@($Arguments | ForEach-Object { ConvertTo-WindowsArgument $_ }) -join ' ')
-    $info.UseShellExecute = $false
-    $info.CreateNoWindow = $true
-    $info.RedirectStandardOutput = $true
-    $info.RedirectStandardError = $true
-    $info.StandardOutputEncoding = [Text.UTF8Encoding]::new($false, $true)
-    $info.StandardErrorEncoding = [Text.UTF8Encoding]::new($false)
-
-    # Environment changes are confined to the child. --proxy and --noproxy are
-    # authoritative even if the calling shell has proxy environment variables.
-    foreach ($key in @($info.EnvironmentVariables.Keys)) {
-        if ($key -match '^(http_proxy|https_proxy|all_proxy|no_proxy)$') {
-            $info.EnvironmentVariables.Remove($key)
-        }
-    }
-
-    $process = [Diagnostics.Process]::new()
-    $process.StartInfo = $info
-    return $process
-}
-
-# ---------------------------------------------------------------------------
-# Stop-TranslateProcess <Process>
-#   Kill and dispose a child process, tolerating one that already exited.
-# ---------------------------------------------------------------------------
-function Stop-TranslateProcess($Process) {
-    if ($null -eq $Process) {
-        return
-    }
-
-    try {
-        if (-not $Process.HasExited) {
-            $Process.Kill()
-        }
-
-        while (-not $Process.WaitForExit(50)) { }
-    } catch [InvalidOperationException] {
-    } finally {
-        $Process.Dispose()
-    }
-}
-
-# ---------------------------------------------------------------------------
 # Get-SystemCurl
 #   Return the path to the Windows-bundled curl.exe. It must be 7.76.0 or
 #   newer for --fail-with-body; an older one rejects that option at request
@@ -94,26 +32,6 @@ function Get-SystemCurl {
     }
 
     return $path
-}
-
-# ---------------------------------------------------------------------------
-# Test-TranslateProcessIdentity <ProcessId> <StartTicks>
-#   Return whether the live process with ProcessId is the same one that
-#   started at StartTicks. The start time distinguishes the original owner
-#   from an unrelated process that later reused the id.
-# ---------------------------------------------------------------------------
-function Test-TranslateProcessIdentity([int] $ProcessId, [long] $StartTicks) {
-    $process = $null
-    try {
-        $process = [Diagnostics.Process]::GetProcessById($ProcessId)
-        return $process.StartTime.ToUniversalTime().Ticks -eq $StartTicks
-    } catch [ArgumentException] {
-        return $false
-    } finally {
-        if ($null -ne $process) {
-            $process.Dispose()
-        }
-    }
 }
 
 # ---------------------------------------------------------------------------
@@ -155,7 +73,7 @@ function Clear-StaleTranslateRequests {
         $ownerId = [int]$Matches[1]
         $ownerTicks = [long]$Matches[2]
         try {
-            if (Test-TranslateProcessIdentity $ownerId $ownerTicks) {
+            if (Test-ProcessIdentity $ownerId $ownerTicks) {
                 continue
             }
 
@@ -168,8 +86,8 @@ function Clear-StaleTranslateRequests {
 
                 $childId = [int]$Matches[1]
                 $childTicks = [long]$Matches[2]
-                if (Test-TranslateProcessIdentity $childId $childTicks) {
-                    Stop-TranslateProcess ([Diagnostics.Process]::GetProcessById($childId))
+                if (Test-ProcessIdentity $childId $childTicks) {
+                    Stop-ChildProcess ([Diagnostics.Process]::GetProcessById($childId))
                 }
             }
 
@@ -291,7 +209,7 @@ function Invoke-CurlSse($Config, $Request, [string] $OutputFile, [Threading.Canc
             $arguments += @('--proxy', '', '--noproxy', '*')
         }
 
-        $process = New-CurlProcess $executable $arguments
+        $process = New-ChildProcess $executable $arguments
         [void]$process.Start()
 
         # Drain stderr immediately on the .NET async IO path, without a runspace
@@ -379,7 +297,7 @@ function Invoke-CurlSse($Config, $Request, [string] $OutputFile, [Threading.Canc
         # Nested finally blocks: each stage must run even if an earlier one
         # throws, or the request directory would be left behind.
         try {
-            Stop-TranslateProcess $process
+            Stop-ChildProcess $process
         } finally {
             try {
                 if ($null -ne $writer) {

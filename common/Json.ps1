@@ -8,32 +8,32 @@
 # reformats numbers. API payloads need exact round-tripping of both.
 
 # ---------------------------------------------------------------------------
-# TranslateJsonNode
+# StrictJsonNode
 #   One node in the parsed tree. Kind is object, array, string, number,
 #   boolean, or null. Numbers keep their source token as a string so the exact
 #   literal survives to the outgoing request.
 # ---------------------------------------------------------------------------
-class TranslateJsonNode {
+class StrictJsonNode {
     [string] $Kind
     [object] $Value
 
-    TranslateJsonNode([string] $kind, [object] $value) {
+    StrictJsonNode([string] $kind, [object] $value) {
         $this.Kind = $kind
         $this.Value = $value
     }
 }
 
 # ---------------------------------------------------------------------------
-# TranslateJsonParser
+# StrictJsonParser
 #   Recursive-descent parser over the whole input string. Index is the read
 #   cursor; Depth guards against stack exhaustion from deeply nested input.
 # ---------------------------------------------------------------------------
-class TranslateJsonParser {
+class StrictJsonParser {
     [string] $Source
     [int] $Index
     [int] $Depth
 
-    TranslateJsonParser([string] $source) {
+    StrictJsonParser([string] $source) {
         $this.Source = $source
     }
 
@@ -135,7 +135,7 @@ class TranslateJsonParser {
         return $result
     }
 
-    [TranslateJsonNode] ValueNode() {
+    [StrictJsonNode] ValueNode() {
         $this.WhiteSpace()
         $this.Depth++
         if ($this.Depth -gt 256) {
@@ -173,7 +173,7 @@ class TranslateJsonParser {
                 } while ($true)
             }
 
-            $node = [TranslateJsonNode]::new('object', $map)
+            $node = [StrictJsonNode]::new('object', $map)
         } elseif ($ch -ceq '[') {
             $this.Index++
             $items = [Collections.Generic.List[object]]::new()
@@ -190,9 +190,9 @@ class TranslateJsonParser {
                 } while ($true)
             }
 
-            $node = [TranslateJsonNode]::new('array', $items)
+            $node = [StrictJsonNode]::new('array', $items)
         } elseif ($ch -ceq '"') {
-            $node = [TranslateJsonNode]::new('string', $this.String())
+            $node = [StrictJsonNode]::new('string', $this.String())
         } else {
             # Bare token: a literal or a number, delimited by whitespace or a
             # structural character.
@@ -203,15 +203,15 @@ class TranslateJsonParser {
 
             $token = $this.Source.Substring($start, $this.Index - $start)
             switch -CaseSensitive ($token) {
-                'true' { $node = [TranslateJsonNode]::new('boolean', $true) }
-                'false' { $node = [TranslateJsonNode]::new('boolean', $false) }
-                'null' { $node = [TranslateJsonNode]::new('null', $null) }
+                'true' { $node = [StrictJsonNode]::new('boolean', $true) }
+                'false' { $node = [StrictJsonNode]::new('boolean', $false) }
+                'null' { $node = [StrictJsonNode]::new('null', $null) }
                 default {
                     if ($token -cnotmatch '\A-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?\z') {
                         $this.Fail('invalid value or number')
                     }
 
-                    $node = [TranslateJsonNode]::new('number', $token)
+                    $node = [StrictJsonNode]::new('number', $token)
                 }
             }
         }
@@ -221,7 +221,7 @@ class TranslateJsonParser {
     }
 
     # Parse one complete document; trailing content is an error.
-    [TranslateJsonNode] Parse() {
+    [StrictJsonNode] Parse() {
         $node = $this.ValueNode()
         $this.WhiteSpace()
         if ($this.Index -ne $this.Source.Length) {
@@ -234,10 +234,10 @@ class TranslateJsonParser {
 
 # ---------------------------------------------------------------------------
 # ConvertFrom-StrictJson <Text>
-#   Parse a complete JSON document into a TranslateJsonNode tree.
+#   Parse a complete JSON document into a StrictJsonNode tree.
 # ---------------------------------------------------------------------------
 function ConvertFrom-StrictJson([string] $Text) {
-    return [TranslateJsonParser]::new($Text).Parse()
+    return [StrictJsonParser]::new($Text).Parse()
 }
 
 # ---------------------------------------------------------------------------
@@ -309,7 +309,7 @@ function ConvertTo-JsonString([AllowEmptyString()][string] $Text) {
 
 # ---------------------------------------------------------------------------
 # ConvertTo-StrictJson <Value>
-#   Serialize a hashtable, array, string, bool, integer, or TranslateJsonNode
+#   Serialize a hashtable, array, string, bool, integer, or StrictJsonNode
 #   to compact JSON. A number node is emitted as its original token, so a
 #   value read as 1.50 or 1e3 is written back exactly as it appeared.
 # ---------------------------------------------------------------------------
@@ -318,7 +318,7 @@ function ConvertTo-StrictJson($Value) {
         return 'null'
     }
 
-    if ($Value -is [TranslateJsonNode]) {
+    if ($Value -is [StrictJsonNode]) {
         switch ($Value.Kind) {
             'number' { return $Value.Value }
             'null' { return 'null' }

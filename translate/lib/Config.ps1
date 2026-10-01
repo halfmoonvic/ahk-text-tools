@@ -10,47 +10,6 @@
 # than failing later against a live API.
 
 # ---------------------------------------------------------------------------
-# Resolve-TranslateFilePath <Path>
-#   Resolve Path to a full filesystem path without requiring it to exist.
-#   Rejects non-FileSystem providers so a path like Env:\FOO cannot be used
-#   where a file is expected.
-# ---------------------------------------------------------------------------
-function Resolve-TranslateFilePath([string] $Path) {
-    $provider = $null
-    $drive = $null
-    $resolved = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path, [ref]$provider, [ref]$drive)
-    if ($provider.Name -ne 'FileSystem') {
-        throw 'only FileSystem paths are supported'
-    }
-
-    return $resolved
-}
-
-# ---------------------------------------------------------------------------
-# Read-TranslateConfigFile <Path>
-#   Read one configuration file and return its parsed JSON object node.
-#   Decoding is strict UTF-8, so a mis-encoded file is reported as invalid
-#   rather than silently producing replacement characters.
-# ---------------------------------------------------------------------------
-function Read-TranslateConfigFile([string] $Path) {
-    if (-not [IO.File]::Exists($Path)) {
-        throw "missing configuration file: $Path"
-    }
-
-    try {
-        $node = ConvertFrom-StrictJson ([IO.File]::ReadAllText($Path, [Text.UTF8Encoding]::new($false, $true)))
-    } catch {
-        throw "invalid JSON in $Path"
-    }
-
-    if ($node.Kind -ne 'object') {
-        throw "configuration must be a JSON object: $Path"
-    }
-
-    return $node
-}
-
-# ---------------------------------------------------------------------------
 # Get-TranslateCommonConfig
 #   Load config.json and the settings both modes need. Returned Threshold is
 #   the Chinese-character ratio above which auto-detection picks English as
@@ -64,8 +23,8 @@ function Get-TranslateCommonConfig {
             # Not the automatic $HOME: it resolves separately and would drift.
             Join-Path $env:USERPROFILE '.config\translate'
         }
-    $directory = Resolve-TranslateFilePath $directory
-    $settings = Read-TranslateConfigFile (Join-Path $directory 'config.json')
+    $directory = Resolve-FileSystemPath $directory
+    $settings = Read-JsonConfigFile (Join-Path $directory 'config.json')
 
     $thresholdNode = Get-JsonMember $settings 'chineseRatioThreshold'
     $thresholdText = '0.3'
@@ -96,55 +55,6 @@ function Get-TranslateCommonConfig {
 }
 
 # ---------------------------------------------------------------------------
-# Get-TranslateProxy <Settings> <Provider> <Scheme> [-HttpOnly]
-#   Return the configured proxy URL for Provider, or '' when that provider is
-#   not listed under proxy.providers.
-#
-#   -HttpOnly applies the narrower rules the vendored Google Shell script can
-#   parse; the AI adapters pass the URL straight to curl and accept any
-#   supported scheme.
-# ---------------------------------------------------------------------------
-function Get-TranslateProxy($Settings, [string] $Provider, [string] $Scheme, [switch] $HttpOnly) {
-    $proxy = Get-JsonMember $Settings 'proxy'
-    $providers = Get-JsonMember $proxy 'providers'
-    if ($null -eq $providers -or $providers.Kind -ne 'array') {
-        return ''
-    }
-
-    foreach ($item in $providers.Value) {
-        if ((Get-JsonString $item) -cne $Provider) {
-            continue
-        }
-
-        $url = Get-JsonString (Get-JsonMember $proxy $Scheme)
-        $uri = $null
-        if (-not [Uri]::TryCreate($url, [UriKind]::Absolute, [ref]$uri) -or
-            $uri.Scheme -notin @('http', 'https', 'socks4', 'socks4a', 'socks5', 'socks5h') -or
-            -not $uri.Host -or
-            $url -match '[\x00-\x20\x7f]') {
-            throw "invalid $Scheme proxy for provider '$Provider'"
-        }
-
-        if ($HttpOnly) {
-            if ($uri.Scheme -ne 'http' -or
-                $uri.HostNameType -eq [UriHostNameType]::IPv6 -or
-                $uri.AbsolutePath -ne '/' -or
-                $uri.Query -or
-                $uri.Fragment) {
-                throw 'Google Shell supports only an HTTP proxy with a hostname or IPv4 address and optional credentials'
-            }
-
-            # The legacy parser requires an explicit port, even for port 80.
-            return 'http://' + $(if ($uri.UserInfo) { $uri.UserInfo + '@' }) + $uri.Host + ':' + $uri.Port
-        }
-
-        return $url
-    }
-
-    return ''
-}
-
-# ---------------------------------------------------------------------------
 # Get-TranslateConfig [<ModelOverride>]
 #   Load and cross-validate all three files for AI mode, returning everything
 #   an adapter needs to build one request. ModelOverride takes precedence over
@@ -154,8 +64,8 @@ function Get-TranslateConfig([string] $ModelOverride) {
     $common = Get-TranslateCommonConfig
     $directory = $common.Directory
     $settings = $common.Settings
-    $auth = Read-TranslateConfigFile (Join-Path $directory 'auth.json')
-    $models = Read-TranslateConfigFile (Join-Path $directory 'models.json')
+    $auth = Read-JsonConfigFile (Join-Path $directory 'auth.json')
+    $models = Read-JsonConfigFile (Join-Path $directory 'models.json')
 
     $selected = $ModelOverride
     if ([string]::IsNullOrWhiteSpace($selected)) {
@@ -246,7 +156,7 @@ function Get-TranslateConfig([string] $ModelOverride) {
         $systemPrompt = 'You are a direct translation engine. Output only the translated text and preserve paragraph breaks.'
     }
 
-    $proxyUrl = Get-TranslateProxy $settings $providerName $uri.Scheme
+    $proxyUrl = Get-ProxyUrl $settings $providerName $uri.Scheme
 
     $timeoutNode = Get-JsonMember $settings 'connectTimeoutSeconds'
     $connectTimeout = 10

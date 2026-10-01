@@ -125,7 +125,7 @@ take over the key combination from every other program.
 | --- | --- |
 | `auth.json` | API keys, one per provider. **Never commit this.** |
 | `models.json` | Providers, their base URLs, API flavour, and models |
-| `config.json` | Default model, proxy, connection timeout, language-detection threshold, system prompt |
+| `config.json` | Default model, proxy, connection timeout, language-detection threshold, prompts |
 
 `api` in `models.json` must be one of `openai-completions`,
 `openai-responses`, or `anthropic-messages`.
@@ -134,6 +134,17 @@ take over the key combination from every other program.
 limits only connecting to the provider — the DNS lookup and the TCP and TLS
 handshakes. It does not limit how long a response may take. The `google`
 engine does not use it.
+
+The two prompts sent to the model live under `ai` in `config.json`:
+
+- `ai.systemPrompt` sets the rules the model follows for every request.
+- `ai.userPrompt` is the instruction for each request. `{language}` in it is
+  replaced with `English` or `Simplified Chinese`. The selected text is always
+  appended after it as a `<text>…</text>` block, so the instruction may refer
+  to `<text>` but should not contain the block itself.
+
+Both fall back to built-in defaults when missing or empty; a `userPrompt`
+that is not a string is an error. The `google` engine uses neither.
 
 Set `TRANSLATE_CONFIG_DIR` to point the translator at a different directory —
 useful for testing without disturbing your real keys. It affects only the

@@ -166,7 +166,8 @@ text-tools/
 ├── auto_hotkey/
 │   ├── text.ahk            <- entry point
 │   ├── json.ahk, proc.ahk  <- #Include'd by text.ahk
-│   └── run-task.ps1        <- wraps each child process
+│   ├── run-batch.ps1       <- runs all translate engines in one process
+│   └── run-task.ps1        <- wraps the kana child process
 ├── translate/              <- translation engine
 │   ├── Translate.Core.psm1
 │   ├── lib/, adapters/

@@ -1,7 +1,7 @@
 # Translate.Core.psm1 - Module entry point for the translate tool.
 #
 # Imported by translate.ps1 and by the AutoHotkey front-end through
-# run-task.ps1. Invoke-Translate is the only exported command.
+# run-batch.ps1. Invoke-Translate is the only exported command.
 #
 # The lib and adapter files are dot-sourced rather than made into nested
 # modules so they share one scope: the adapters call helpers from Json.ps1 and

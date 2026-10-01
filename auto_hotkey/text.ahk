@@ -632,7 +632,7 @@ CreateTextToolRun(batch, text) {
     guidText := Buffer(78)
     DllCall("ole32\StringFromGUID2", "ptr", guid, "ptr", guidText, "int", 39)
     directory := A_Temp "\text-tools-" StrGet(guidText)
-    run := {Dir: directory, Tasks: [], Owner: batch, Cancelled: false, Cleaned: false, Poller: 0}
+    run := {Dir: directory, Tasks: [], Procs: [], Owner: batch, Cancelled: false, Cleaned: false, Poller: 0}
     run.Poller := (*) => PollTextToolBatch(run)
     TextToolRuns[directory] := run
     batch.Current := run
@@ -645,21 +645,19 @@ CreateTextToolRun(batch, text) {
 StartTextToolRunTasks(run) {
     global TextToolRoot
     batch := run.Owner
+    if batch.ScriptName = "translate.ps1" {
+        StartTextToolTranslateTasks(run)
+        return
+    }
     for row in batch.Tasks {
-        task := {Row: row, Process: 0, Done: false, Output: "", Error: "",
+        task := {Row: row, Process: 0, Done: false, StatusFile: "", BatchErrorFile: "",
             OutputFile: run.Dir "\" A_Index ".out", ErrorFile: run.Dir "\" A_Index ".err"}
         run.Tasks.Push(task)
         try {
-            arguments := ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+            task.Process := Proc(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
                 TextToolRoot "\auto_hotkey\run-task.ps1", "-Script", TextToolRoot "\" batch.ScriptName,
-                "-InputFile", run.Input, "-OutputFile", task.OutputFile]
-            if batch.ScriptName = "translate.ps1" {
-                if row.Engine = "google"
-                    arguments.Push("-Mode", "google")
-                else
-                    arguments.Push("-Model", row.Engine)
-            }
-            task.Process := Proc(arguments, task.ErrorFile)
+                "-InputFile", run.Input, "-OutputFile", task.OutputFile], task.ErrorFile)
+            run.Procs.Push(task.Process)
             row.Status.Value := "Running..."
         } catch as err {
             task.Done := true
@@ -670,12 +668,33 @@ StartTextToolRunTasks(run) {
     }
 }
 
+; One process runs every engine; each reports through its own N.status file.
+; A start failure throws to BeginTextToolRun before any task exists to poll.
+StartTextToolTranslateTasks(run) {
+    global TextToolRoot
+    batch := run.Owner
+    engines := ""
+    for row in batch.Tasks
+        engines .= row.Engine "`n"
+    engineFile := run.Dir "\engines.txt"
+    FileAppend(engines, engineFile, "UTF-8-RAW")
+    batchErrorFile := run.Dir "\batch.err"
+    process := Proc(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+        TextToolRoot "\auto_hotkey\run-batch.ps1", "-InputFile", run.Input,
+        "-EngineFile", engineFile, "-OutputDirectory", run.Dir], batchErrorFile)
+    run.Procs.Push(process)
+    for row in batch.Tasks {
+        run.Tasks.Push({Row: row, Process: process, Done: false,
+            StatusFile: run.Dir "\" A_Index ".status", BatchErrorFile: batchErrorFile,
+            OutputFile: run.Dir "\" A_Index ".out", ErrorFile: run.Dir "\" A_Index ".err"})
+        row.Status.Value := "Running..."
+    }
+}
+
 StopTextToolRun(run) {
     run.Cancelled := true
-    for task in run.Tasks {
-        if !task.Done && task.Process
-            task.Process.Stop()
-    }
+    for process in run.Procs
+        process.Stop()
 }
 
 PollTextToolBatch(run) {
@@ -687,27 +706,36 @@ PollTextToolBatch(run) {
         batch := run.Owner
         active := batch.Open && batch.Current = run && !run.Cancelled
         allDone := true
+        ; Before the status files: once a process has exited, every status
+        ; file it was going to write already exists.
+        exited := Map()
+        for process in run.Procs {
+            exited[process] := process.Poll()
+            if !exited[process]
+                allDone := false
+        }
         updates := []
         for task in run.Tasks {
             if task.Done
                 continue
-            finished := task.Process.Poll()
+            errorFile := task.ErrorFile
+            exitCode := GetTextToolTaskExit(task, exited, &errorFile)
+            finished := exitCode != ""
             if active {
                 row := task.Row
                 output := row.Output, errorOutput := row.Error
                 outputRead := TryReadTaskFile(task.OutputFile, &output)
-                errorRead := TryReadTaskFile(task.ErrorFile, &errorOutput)
+                errorRead := TryReadTaskFile(errorFile, &errorOutput)
                 ; A final locked file must be retried before disposing the task.
-                if finished && ((!outputRead && FileExist(task.OutputFile)) || (!errorRead && FileExist(task.ErrorFile)))
+                if finished && ((!outputRead && FileExist(task.OutputFile)) || (!errorRead && FileExist(errorFile)))
                     finished := false
-                status := finished ? (task.Process.ExitCode != 0 ? "Failed (exit " task.Process.ExitCode ")" : (Trim(output) = "" ? "Failed (empty output)" : "Completed")) : row.Status.Value
+                status := finished ? (exitCode != 0 ? "Failed (exit " exitCode ")" : (Trim(output) = "" ? "Failed (empty output)" : "Completed")) : row.Status.Value
                 if !(output == row.Output) || !(errorOutput == row.Error) || !(status == row.Status.Value)
                     updates.Push({Row: row, Output: output, Error: errorOutput, Status: status})
             }
-            if finished {
+            if finished
                 task.Done := true
-                task.Process.Dispose()
-            } else
+            else
                 allDone := false
         }
         if updates.Length && active {
@@ -740,11 +768,29 @@ PollTextToolBatch(run) {
         }
         if allDone {
             SetTimer(run.Poller, 0)
+            ; Emptied so a cleanup retry never polls a disposed process.
+            for process in run.Procs
+                process.Dispose()
+            run.Procs := []
             CleanupTextToolRun(run)
         }
     } finally {
         Critical "Off"
     }
+}
+
+; Exit code of a finished task, or "" while it still runs.
+GetTextToolTaskExit(task, exited, &errorFile) {
+    if task.StatusFile = ""
+        return exited[task.Process] ? task.Process.ExitCode : ""
+    if TryReadTaskFile(task.StatusFile, &statusText)
+        return Trim(statusText)
+    ; A locked status file is retried. A missing one after exit means the batch
+    ; stopped before this engine finished, and only its own error says why.
+    if !exited[task.Process] || FileExist(task.StatusFile)
+        return ""
+    errorFile := task.BatchErrorFile
+    return task.Process.ExitCode || 1
 }
 
 CloseTextToolBatch(batch) {

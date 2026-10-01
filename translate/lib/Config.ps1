@@ -68,13 +68,8 @@ function Get-TranslateAiSettings($Common, [string] $ModelOverride) {
         $selected = $selection.Value
     }
 
-    # systemPrompt moved to the top level; ai.systemPrompt is the older location.
-    $promptNode = Get-JsonMember $settings 'systemPrompt'
-    if ($null -eq $promptNode -or $promptNode.Kind -ne 'string') {
-        $promptNode = Get-JsonMember (Get-JsonMember $settings 'ai') 'systemPrompt'
-    }
-
-    $systemPrompt = Get-JsonString $promptNode
+    $ai = Get-JsonMember $settings 'ai'
+    $systemPrompt = Get-JsonString (Get-JsonMember $ai 'systemPrompt')
     if (-not $systemPrompt) {
         $systemPrompt = 'You are a direct translation engine. Output only the translated text and preserve paragraph breaks.'
     }

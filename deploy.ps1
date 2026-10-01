@@ -200,6 +200,7 @@ function Install-ProgramFiles {
         'auto_hotkey\text.ahk'
         'auto_hotkey\json.ahk'
         'auto_hotkey\proc.ahk'
+        'auto_hotkey\run-batch.ps1'
         'auto_hotkey\run-task.ps1'
         'translate.ps1'
         'kana.ps1'

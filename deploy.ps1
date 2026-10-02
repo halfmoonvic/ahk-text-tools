@@ -12,7 +12,9 @@
 .EXAMPLE
     .\deploy.ps1
     Install (or refresh) into ~\.local\bin\text-tools, with translate.ps1 and
-    kana.ps1 shims in ~\.local\bin and configuration in ~\.config.
+    kana.ps1 shims in ~\.local\bin and configuration in ~\.config\text-tools.
+    Configuration from the older ~\.config\translate and ~\.config\ahk layout
+    is migrated into any file that does not exist yet.
 
 .EXAMPLE
     .\deploy.ps1 -Update
@@ -21,7 +23,7 @@
 .EXAMPLE
     .\deploy.ps1 -TargetDir D:\tools
     Install into D:\tools\text-tools with the shims in D:\tools; configuration
-    still goes to ~\.config.
+    still goes to ~\.config\text-tools.
 #>
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
@@ -48,10 +50,23 @@ if ($PSVersionTable.PSVersion.Major -lt 6) {
 $RepoRoot = $PSScriptRoot
 # The shims find the program by this fixed name next to them.
 $ProgramDir = Join-Path $TargetDir 'text-tools'
-# Not a parameter: text.ahk, kana.ps1 and translate read configuration only from here.
-$ConfigDir = Join-Path $env:USERPROFILE '.config'
+# Not a parameter: it must be the directory the tools read, so it follows
+# Get-ConfigDirectory in common\Config.ps1.
+$ConfigDir =
+    if ($env:TEXT_TOOLS_CONFIG_DIR) {
+        $env:TEXT_TOOLS_CONFIG_DIR
+    } else {
+        Join-Path $env:USERPROFILE '.config\text-tools'
+    }
+# Where earlier versions kept their configuration. Only ever read, to migrate it.
+$LegacyConfigDir = Join-Path $env:USERPROFILE '.config'
 $script:Stats = [ordered]@{ Created = 0; Updated = 0; Unchanged = 0; Skipped = 0 }
 $script:Warnings = [Collections.Generic.List[string]]::new()
+$script:Migrated = $false
+
+# The strict parser keeps key order and number tokens, so migrated values are
+# written back exactly as the user had them.
+. (Join-Path $RepoRoot 'common\Json.ps1')
 
 #region helpers ---------------------------------------------------------------
 
@@ -396,6 +411,24 @@ function Compare-JsonShape($Expected, $Actual, [string] $Prefix = '') {
     return $differences.ToArray()
 }
 
+# ---------------------------------------------------------------------------
+# Get-TemplateDifference <Template> <Json>
+#   Return the keys the template has that the configuration text Json lacks.
+# ---------------------------------------------------------------------------
+function Get-TemplateDifference([string] $Template, [string] $Json) {
+    # Distinct names: PowerShell variables are case-insensitive, so $template
+    # here would silently overwrite the $Template parameter.
+    $templateJson = Get-Content -LiteralPath $Template -Raw -Encoding UTF8 | ConvertFrom-Json
+    $currentJson =
+        if (-not [string]::IsNullOrWhiteSpace($Json)) {
+            $Json | ConvertFrom-Json
+        }
+    if ($null -eq $currentJson) {
+        throw 'file is empty or not a JSON object'
+    }
+    return @(Compare-JsonShape $templateJson $currentJson)
+}
+
 # auth.json holds real API keys, so it is written once and never touched again.
 # ---------------------------------------------------------------------------
 # Install-ConfigFile <Template> <Destination> <Label> [-NeverOverwrite]
@@ -431,17 +464,10 @@ function Install-ConfigFile([string] $Template, [string] $Destination, [string] 
     if (-not $Force) {
         $script:Stats.Skipped++
         Write-Item 'kept' $Label DarkGray
-        # Distinct names: PowerShell variables are case-insensitive, so $template
-        # here would silently overwrite the $Template parameter.
         $differences = @()
         $parsed = $false
         try {
-            $templateJson = Get-Content -LiteralPath $Template -Raw -Encoding UTF8 | ConvertFrom-Json
-            $currentJson = Get-Content -LiteralPath $Destination -Raw -Encoding UTF8 | ConvertFrom-Json
-            if ($null -eq $currentJson) {
-                throw 'file is empty or not a JSON object'
-            }
-            $differences = @(Compare-JsonShape $templateJson $currentJson)
+            $differences = @(Get-TemplateDifference $Template (Get-Content -LiteralPath $Destination -Raw -Encoding UTF8))
             $parsed = $true
         } catch {
             Write-Warn "$Label could not be compared to the template: $($_.Exception.Message)"
@@ -468,24 +494,283 @@ function Install-ConfigFile([string] $Template, [string] $Destination, [string] 
 }
 
 # ---------------------------------------------------------------------------
+# Read-LegacyJson <Relative>
+#   Parse one old configuration file under LegacyConfigDir.
+# ---------------------------------------------------------------------------
+function Read-LegacyJson([string] $Relative) {
+    $path = Join-Path $LegacyConfigDir $Relative
+    try {
+        $node = ConvertFrom-StrictJson ([IO.File]::ReadAllText($path, [Text.UTF8Encoding]::new($false, $true)))
+    } catch {
+        throw "$Relative is not valid JSON"
+    }
+    if ($node.Kind -ne 'object') {
+        throw "$Relative is not a JSON object"
+    }
+    return $node
+}
+
+# ---------------------------------------------------------------------------
+# Select-JsonMember <Node> <Names> <Unknown> [<Prefix>]
+#   Copy the members of Node named in Names, in that order, into a new ordered
+#   dictionary. Member names not in Names are added to Unknown, dotted with
+#   Prefix, so they can be reported as not migrated.
+# ---------------------------------------------------------------------------
+function Select-JsonMember($Node, [string[]] $Names, $Unknown, [string] $Prefix = '') {
+    $selected = [ordered]@{}
+    if ($null -eq $Node) {
+        return $selected
+    }
+    if ($Node.Kind -ne 'object') {
+        $Unknown.Add($Prefix.TrimEnd('.'))
+        return $selected
+    }
+    foreach ($name in $Names) {
+        if ($Node.Value.ContainsKey($name)) {
+            $selected[$name] = $Node.Value[$name]
+        }
+    }
+    foreach ($name in $Node.Value.Keys) {
+        if ($name -cnotin $Names) {
+            $Unknown.Add("$Prefix$name")
+        }
+    }
+    return $selected
+}
+
+# ---------------------------------------------------------------------------
+# Write-NotMigrated <Relative> <Unknown>
+#   Report the keys of an old file that have no place in the new layout.
+# ---------------------------------------------------------------------------
+function Write-NotMigrated([string] $Relative, $Unknown) {
+    if ($Unknown.Count -gt 0) {
+        Write-Warn "$Relative`: not migrated: $($Unknown -join ', ')"
+    }
+}
+
+# ---------------------------------------------------------------------------
+# New-MigratedConfig
+#   Build config.json from the old translate\config.json and the kana options
+#   of the old ahk\settings.json.
+# ---------------------------------------------------------------------------
+function New-MigratedConfig {
+    $old = Read-LegacyJson 'translate\config.json'
+    $unknown = [Collections.Generic.List[string]]::new()
+    $top = Select-JsonMember $old @('proxy', 'defaultThinkingLevel', 'modelThinkingLevels',
+        'connectTimeoutSeconds', 'model', 'chineseRatioThreshold', 'ai') $unknown
+
+    $result = [ordered]@{}
+    if ($top.Contains('proxy')) {
+        $result['proxy'] = $top['proxy']
+    }
+
+    $llm = [ordered]@{}
+    foreach ($name in 'defaultThinkingLevel', 'modelThinkingLevels', 'connectTimeoutSeconds') {
+        if ($top.Contains($name)) {
+            $llm[$name] = $top[$name]
+        }
+    }
+    if ($llm.Count -gt 0) {
+        $result['llm'] = $llm
+    }
+
+    $translate = [ordered]@{}
+    foreach ($name in 'model', 'chineseRatioThreshold') {
+        if ($top.Contains($name)) {
+            $translate[$name] = $top[$name]
+        }
+    }
+    $ai = Select-JsonMember $top['ai'] @('systemPrompt', 'userPrompt') $unknown 'ai.'
+    if ($ai.Count -gt 0) {
+        $translate['ai'] = $ai
+    }
+    if ($translate.Count -gt 0) {
+        $result['translate'] = $translate
+    }
+    Write-NotMigrated 'translate\config.json' $unknown
+
+    # Only the kana options are taken here; New-MigratedSettings reports the rest.
+    if (Test-Path -LiteralPath (Join-Path $LegacyConfigDir 'ahk\settings.json') -PathType Leaf) {
+        $settings = Read-LegacyJson 'ahk\settings.json'
+        $ignored = [Collections.Generic.List[string]]::new()
+        $kana = Select-JsonMember (Get-JsonMember (Get-JsonMember $settings 'japanese') 'kana') @('to', 'mode') $ignored
+        if ($kana.Count -gt 0) {
+            $result['kana'] = $kana
+        }
+    }
+
+    return $result
+}
+
+# ---------------------------------------------------------------------------
+# New-MigratedSettings
+#   Build settings.json from the old ahk\settings.json: the engine list moves
+#   under engines, and the kana options move to config.json.
+# ---------------------------------------------------------------------------
+function New-MigratedSettings {
+    $old = Read-LegacyJson 'ahk\settings.json'
+    $unknown = [Collections.Generic.List[string]]::new()
+    $top = Select-JsonMember $old @('translate', 'hotkeys', 'ui', 'japanese') $unknown
+
+    $result = [ordered]@{}
+    if ($top.Contains('translate')) {
+        $result['engines'] = [ordered]@{ translate = $top['translate'] }
+    }
+    foreach ($name in 'hotkeys', 'ui') {
+        if ($top.Contains($name)) {
+            $result[$name] = $top[$name]
+        }
+    }
+
+    $japanese = Select-JsonMember $top['japanese'] @('kana') $unknown 'japanese.'
+    [void](Select-JsonMember $japanese['kana'] @('to', 'mode') $unknown 'japanese.kana.')
+    Write-NotMigrated 'ahk\settings.json' $unknown
+    return $result
+}
+
+# ---------------------------------------------------------------------------
+# New-MigratedModels
+#   Build models.json from the providers of the old translate\models.json.
+# ---------------------------------------------------------------------------
+function New-MigratedModels {
+    $old = Read-LegacyJson 'translate\models.json'
+    $unknown = [Collections.Generic.List[string]]::new()
+    $top = Select-JsonMember $old @('providers') $unknown
+    if (-not $top.Contains('providers') -or $top['providers'].Kind -ne 'object') {
+        throw 'translate\models.json has no providers object'
+    }
+    Write-NotMigrated 'translate\models.json' $unknown
+    return $top['providers']
+}
+
+# ---------------------------------------------------------------------------
+# Format-ConfigJson <Value> [<Indent>]
+#   Serialize a migrated value in the style of the templates: four-space
+#   indentation, and arrays of scalars or objects of scalars inside an array
+#   kept on one line. Strings go through ConvertTo-JsonString, so non-ASCII
+#   text and characters such as < stay literal, unlike ConvertTo-Json in
+#   Windows PowerShell.
+# ---------------------------------------------------------------------------
+function Format-ConfigJson($Value, [int] $Indent = 0, [switch] $InArray) {
+    $members = $null
+    $items = $null
+    if ($Value -is [Collections.IDictionary]) {
+        $members = $Value
+    } elseif ($Value.Kind -eq 'object') {
+        $members = $Value.Value
+    } elseif ($Value.Kind -eq 'array') {
+        $items = $Value.Value
+    } else {
+        return ConvertTo-StrictJson $Value
+    }
+
+    $outer = ' ' * (4 * $Indent)
+    $inner = ' ' * (4 * ($Indent + 1))
+    if ($null -ne $members) {
+        if ($members.Count -eq 0) {
+            return '{}'
+        }
+        $scalar = @($members.Values | Where-Object { $_ -is [Collections.IDictionary] -or $_.Kind -in @('object', 'array') }).Count -eq 0
+        if ($InArray -and $scalar) {
+            $pairs = foreach ($key in $members.Keys) {
+                (ConvertTo-JsonString $key) + ': ' + (ConvertTo-StrictJson $members[$key])
+            }
+            return '{ ' + ($pairs -join ', ') + ' }'
+        }
+        $pairs = foreach ($key in $members.Keys) {
+            $inner + (ConvertTo-JsonString $key) + ': ' + (Format-ConfigJson $members[$key] ($Indent + 1))
+        }
+        return "{`n" + ($pairs -join ",`n") + "`n$outer}"
+    }
+
+    if ($items.Count -eq 0) {
+        return '[]'
+    }
+    if (@($items | Where-Object { $_.Kind -in @('object', 'array') }).Count -eq 0) {
+        return '[' + (@($items | ForEach-Object { ConvertTo-StrictJson $_ }) -join ', ') + ']'
+    }
+    $lines = foreach ($item in $items) {
+        $inner + (Format-ConfigJson $item ($Indent + 1) -InArray)
+    }
+    return "[`n" + ($lines -join ",`n") + "`n$outer]"
+}
+
+# ---------------------------------------------------------------------------
+# Copy-LegacyConfig <Name> <Template> <Destination>
+#   Create Destination from the old configuration instead of the template.
+#   The old files are only read; a file that cannot be migrated is reported
+#   and left uncreated, so fixing it and deploying again picks it up.
+# ---------------------------------------------------------------------------
+function Copy-LegacyConfig([string] $Name, [string] $Template, [string] $Destination) {
+    if ($Name -eq 'auth.json') {
+        if (-not $PSCmdlet.ShouldProcess($Destination, 'migrate from translate\auth.json')) {
+            return
+        }
+        New-ParentDirectory $Destination
+        [IO.File]::Copy((Join-Path $LegacyConfigDir 'translate\auth.json'), $Destination)
+        $script:Stats.Created++
+        $script:Migrated = $true
+        Write-Item 'migrated' "$Name (from translate\auth.json; contents not shown)" Green
+        return
+    }
+
+    try {
+        $value = switch ($Name) {
+            'config.json' { New-MigratedConfig }
+            'settings.json' { New-MigratedSettings }
+            'models.json' { New-MigratedModels }
+        }
+        $text = (Format-ConfigJson $value) + "`n"
+    } catch {
+        Write-Warn "could not migrate $Name`: $($_.Exception.Message); fix it and deploy again"
+        return
+    }
+
+    try {
+        $missing = @(Get-TemplateDifference $Template $text)
+        if ($missing.Count -gt 0) {
+            Write-Warn "$Name is missing keys present in the template: $($missing -join ', ')"
+        }
+    } catch {
+        Write-Warn "$Name could not be compared to the template: $($_.Exception.Message)"
+    }
+
+    if (-not $PSCmdlet.ShouldProcess($Destination, 'migrate from the old configuration')) {
+        return
+    }
+    New-ParentDirectory $Destination
+    [IO.File]::WriteAllText($Destination, $text, [Text.UTF8Encoding]::new($false))
+    $script:Stats.Created++
+    $script:Migrated = $true
+    Write-Item 'migrated' $Name Green
+}
+
+# ---------------------------------------------------------------------------
 # Install-Configuration
-#   Install every configuration template into ConfigDir.
+#   Install every configuration file into ConfigDir: migrated from the old
+#   layout when the file is new and its old source exists, otherwise from the
+#   template.
 # ---------------------------------------------------------------------------
 function Install-Configuration {
     Write-Step "Deploying configuration to $ConfigDir"
 
     $map = @(
-        @{ Template = 'config\settings.example.json';              Target = 'text-tools\settings.json' }
-        @{ Template = 'config\config.example.json';                Target = 'text-tools\config.json' }
-        @{ Template = 'config\models.example.json';                Target = 'text-tools\models.json' }
+        @{ Name = 'config.json';   Template = 'config\config.example.json';   Legacy = 'translate\config.json' }
+        @{ Name = 'settings.json'; Template = 'config\settings.example.json'; Legacy = 'ahk\settings.json' }
+        @{ Name = 'models.json';   Template = 'config\models.example.json';   Legacy = 'translate\models.json' }
+        @{ Name = 'auth.json';     Template = 'config\auth.example.json';     Legacy = 'translate\auth.json' }
     )
 
     foreach ($entry in $map) {
-        Install-ConfigFile (Join-Path $RepoRoot $entry.Template) (Join-Path $ConfigDir $entry.Target) $entry.Target
+        $template = Join-Path $RepoRoot $entry.Template
+        $destination = Join-Path $ConfigDir $entry.Name
+        if (-not (Test-Path -LiteralPath $destination) -and
+            (Test-Path -LiteralPath (Join-Path $LegacyConfigDir $entry.Legacy) -PathType Leaf)) {
+            Copy-LegacyConfig $entry.Name $template $destination
+        } else {
+            Install-ConfigFile $template $destination $entry.Name -NeverOverwrite:($entry.Name -eq 'auth.json')
+        }
     }
-
-    Install-ConfigFile (Join-Path $RepoRoot 'config\auth.example.json') `
-        (Join-Path $ConfigDir 'text-tools\auth.json') 'text-tools\auth.json' -NeverOverwrite
 }
 
 #endregion
@@ -517,7 +802,7 @@ if ($script:Warnings.Count -gt 0) {
     Write-Host "    $($script:Warnings.Count) warning(s) above" -ForegroundColor Yellow
 }
 
-$authPath = Join-Path $ConfigDir 'text-tools\auth.json'
+$authPath = Join-Path $ConfigDir 'auth.json'
 $entryPoint = Join-Path $ProgramDir 'ahk\text.ahk'
 
 Write-Host ''
@@ -526,6 +811,11 @@ Write-Host "  1. Add your API keys to $authPath"
 Write-Host "     (not needed if you only use the free 'google' engine)"
 Write-Host "  2. Run $entryPoint"
 Write-Host '  3. Select text anywhere, then press Win+Alt+A to translate or Win+Alt+S for kana (the defaults)'
+if ($script:Migrated) {
+    Write-Host ''
+    Write-Host "  Your old configuration was copied, not moved. Once everything works, delete" -ForegroundColor White
+    Write-Host "  $(Join-Path $LegacyConfigDir 'translate') and $(Join-Path $LegacyConfigDir 'ahk\settings.json')." -ForegroundColor White
+}
 Write-Host ''
 
 #endregion

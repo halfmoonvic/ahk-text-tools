@@ -476,16 +476,16 @@ function Install-Configuration {
 
     $map = @(
         @{ Template = 'config\ahk\settings.example.json';          Target = 'ahk\settings.json' }
-        @{ Template = 'config\translate\config.example.json';      Target = 'translate\config.json' }
-        @{ Template = 'config\translate\models.example.json';      Target = 'translate\models.json' }
+        @{ Template = 'config\config.example.json';                Target = 'text-tools\config.json' }
+        @{ Template = 'config\models.example.json';                Target = 'text-tools\models.json' }
     )
 
     foreach ($entry in $map) {
         Install-ConfigFile (Join-Path $RepoRoot $entry.Template) (Join-Path $ConfigDir $entry.Target) $entry.Target
     }
 
-    Install-ConfigFile (Join-Path $RepoRoot 'config\translate\auth.example.json') `
-        (Join-Path $ConfigDir 'translate\auth.json') 'translate\auth.json' -NeverOverwrite
+    Install-ConfigFile (Join-Path $RepoRoot 'config\auth.example.json') `
+        (Join-Path $ConfigDir 'text-tools\auth.json') 'text-tools\auth.json' -NeverOverwrite
 }
 
 #endregion
@@ -517,7 +517,7 @@ if ($script:Warnings.Count -gt 0) {
     Write-Host "    $($script:Warnings.Count) warning(s) above" -ForegroundColor Yellow
 }
 
-$authPath = Join-Path $ConfigDir 'translate\auth.json'
+$authPath = Join-Path $ConfigDir 'text-tools\auth.json'
 $entryPoint = Join-Path $ProgramDir 'ahk\text.ahk'
 
 Write-Host ''

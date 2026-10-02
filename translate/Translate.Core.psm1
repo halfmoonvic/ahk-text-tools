@@ -83,7 +83,7 @@ function Invoke-Translate {
         $OutputFile = Resolve-FileSystemPath $OutputFile
     }
 
-    Invoke-LlmStream -ConfigDirectory $common.Directory -Model $settings.Model `
+    Invoke-LlmStream -Model $settings.Model `
         -SystemPrompt $settings.SystemPrompt -Prompt $prompt `
         -OutputFile $OutputFile -CancellationToken $CancellationToken
 }

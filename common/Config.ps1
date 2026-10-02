@@ -22,6 +22,37 @@ function Resolve-FileSystemPath([string] $Path) {
 }
 
 # ---------------------------------------------------------------------------
+# Get-ConfigDirectory
+#   Return the directory holding config.json, models.json and auth.json:
+#   TEXT_TOOLS_CONFIG_DIR when set, otherwise %USERPROFILE%\.config\text-tools.
+#   kana.ps1 and text.ahk resolve the same directory on their own.
+# ---------------------------------------------------------------------------
+function Get-ConfigDirectory {
+    $directory =
+        if ($env:TEXT_TOOLS_CONFIG_DIR) {
+            $env:TEXT_TOOLS_CONFIG_DIR
+        } else {
+            # Not the automatic $HOME: it resolves separately and would drift.
+            Join-Path $env:USERPROFILE '.config\text-tools'
+        }
+    return Resolve-FileSystemPath $directory
+}
+
+# ---------------------------------------------------------------------------
+# Get-ConfigSection <Settings> <Name>
+#   Return one tool's section of config.json, or $null when it is absent so
+#   every value in it falls back to its default.
+# ---------------------------------------------------------------------------
+function Get-ConfigSection($Settings, [string] $Name) {
+    $section = Get-JsonMember $Settings $Name
+    if ($null -ne $section -and $section.Kind -ne 'object') {
+        throw "config.json: $Name must be an object"
+    }
+
+    return $section
+}
+
+# ---------------------------------------------------------------------------
 # Read-JsonConfigFile <Path>
 #   Read one configuration file and return its parsed JSON object node.
 #   Decoding is strict UTF-8, so a mis-encoded file is reported as invalid

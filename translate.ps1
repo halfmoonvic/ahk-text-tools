@@ -6,7 +6,7 @@
     Takes input from -Text, -InputFile, the pipeline, or stdin -- exactly one
     of them -- and streams the translation to -OutputFile or stdout.
 
-    Mode 'ai' uses a provider configured in ~/.config/translate; mode 'google'
+    Mode 'ai' uses a provider configured in ~/.config/text-tools; mode 'google'
     shells out to the vendored Translate Shell script and needs no API key.
     Target 'auto' picks the direction from the ratio of Chinese to Latin
     characters in the input.

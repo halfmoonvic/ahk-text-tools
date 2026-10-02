@@ -26,17 +26,15 @@ foreach ($file in @(
 }
 
 # ---------------------------------------------------------------------------
-# Invoke-LlmStream -ConfigDirectory <Directory> -Model <Model>
-#                  -SystemPrompt <SystemPrompt> -Prompt <Prompt>
-#                  [-OutputFile] [-CancellationToken]
+# Invoke-LlmStream -Model <Model> -SystemPrompt <SystemPrompt>
+#                  -Prompt <Prompt> [-OutputFile] [-CancellationToken]
 #   Send Prompt to Model, a provider/model identifier configured in
-#   ConfigDirectory, and stream the response text to OutputFile, or to stdout
+#   models.json, and stream the response text to OutputFile, or to stdout
 #   when OutputFile is empty. OutputFile must already be a full path.
 # ---------------------------------------------------------------------------
 function Invoke-LlmStream {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory=$true)][string] $ConfigDirectory,
         [Parameter(Mandatory=$true)][string] $Model,
         [Parameter(Mandatory=$true)][string] $SystemPrompt,
         [Parameter(Mandatory=$true)][string] $Prompt,
@@ -44,7 +42,7 @@ function Invoke-LlmStream {
         [Threading.CancellationToken] $CancellationToken = [Threading.CancellationToken]::None
     )
 
-    $config = Get-LlmConfig $ConfigDirectory $Model
+    $config = Get-LlmConfig $Model
     $request = switch ($config.Api) {
         'openai-completions' { New-OpenAICompletionsRequest $config $SystemPrompt $Prompt }
         'openai-responses' { New-OpenAIResponsesRequest $config $SystemPrompt $Prompt }

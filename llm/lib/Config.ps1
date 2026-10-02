@@ -1,22 +1,25 @@
 # Config.ps1 - Loading and validating the model configuration for one request.
 #
-# Dot-sourced by Llm.Core.psm1. The caller names the configuration directory:
-#   config.json  thinking levels, connect timeout, proxy
+# Dot-sourced by Llm.Core.psm1. Reads three files from Get-ConfigDirectory:
+#   config.json  the llm section (thinking levels, connect timeout) and the
+#                top-level proxy shared with the other tools
 #   auth.json    API key per provider
-#   models.json  provider endpoints and their model lists
+#   models.json  provider endpoints and their model lists, keyed by provider
 #
 # Every value is validated on read. Invalid configuration throws here rather
 # than failing later against a live API.
 
 # ---------------------------------------------------------------------------
-# Get-LlmConfig <Directory> <Selected>
+# Get-LlmConfig <Selected>
 #   Load and cross-validate the three files for Selected, a provider/model
 #   identifier, returning everything an adapter needs to build one request.
 # ---------------------------------------------------------------------------
-function Get-LlmConfig([string] $Directory, [string] $Selected) {
-    $settings = Read-JsonConfigFile (Join-Path $Directory 'config.json')
-    $auth = Read-JsonConfigFile (Join-Path $Directory 'auth.json')
-    $models = Read-JsonConfigFile (Join-Path $Directory 'models.json')
+function Get-LlmConfig([string] $Selected) {
+    $directory = Get-ConfigDirectory
+    $settings = Read-JsonConfigFile (Join-Path $directory 'config.json')
+    $auth = Read-JsonConfigFile (Join-Path $directory 'auth.json')
+    $models = Read-JsonConfigFile (Join-Path $directory 'models.json')
+    $llm = Get-ConfigSection $settings 'llm'
 
     # Split only the provider separator. Model IDs and map keys may contain / or .
     $separator = $selected.IndexOf('/')
@@ -26,7 +29,7 @@ function Get-LlmConfig([string] $Directory, [string] $Selected) {
 
     $providerName = $selected.Substring(0, $separator)
     $modelName = $selected.Substring($separator + 1)
-    $provider = Get-JsonMember (Get-JsonMember $models 'providers') $providerName
+    $provider = Get-JsonMember $models $providerName
     if ($null -eq $provider -or $provider.Kind -ne 'object') {
         throw "unknown provider: $providerName"
     }
@@ -70,9 +73,9 @@ function Get-LlmConfig([string] $Directory, [string] $Selected) {
         throw "invalid API key for provider '$providerName'"
     }
 
-    $thinkingNode = Get-JsonMember (Get-JsonMember $settings 'modelThinkingLevels') $selected
+    $thinkingNode = Get-JsonMember (Get-JsonMember $llm 'modelThinkingLevels') $selected
     if ($null -eq $thinkingNode) {
-        $thinkingNode = Get-JsonMember $settings 'defaultThinkingLevel'
+        $thinkingNode = Get-JsonMember $llm 'defaultThinkingLevel'
     }
 
     $thinking =
@@ -87,12 +90,12 @@ function Get-LlmConfig([string] $Directory, [string] $Selected) {
 
     $proxyUrl = Get-ProxyUrl $settings $providerName $uri.Scheme
 
-    $timeoutNode = Get-JsonMember $settings 'connectTimeoutSeconds'
+    $timeoutNode = Get-JsonMember $llm 'connectTimeoutSeconds'
     $connectTimeout = 10
     if ($null -ne $timeoutNode) {
         if ($timeoutNode.Kind -ne 'number' -or
             $timeoutNode.Value -cnotmatch '\A[1-9][0-9]{0,5}\z') {
-            throw 'connectTimeoutSeconds must be a positive integer'
+            throw 'llm.connectTimeoutSeconds must be a positive integer'
         }
 
         $connectTimeout = [int]$timeoutNode.Value

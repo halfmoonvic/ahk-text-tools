@@ -1,33 +1,26 @@
 # Config.ps1 - Loading and validating the translate settings.
 #
-# Dot-sourced by Translate.Core.psm1. Configuration lives in one directory
-# resolved from TRANSLATE_CONFIG_DIR, then %USERPROFILE%\.config\translate.
-# Its config.json holds the translate settings read here; the same directory
-# also holds the model configuration that Get-LlmConfig reads.
+# Dot-sourced by Translate.Core.psm1. The settings read here are the translate
+# section of config.json in Get-ConfigDirectory; the llm module reads the
+# model configuration from the same directory on its own.
 
 # ---------------------------------------------------------------------------
 # Get-TranslateCommonConfig
-#   Load config.json and the settings both modes need. Returned Threshold is
-#   the Chinese-character ratio above which auto-detection picks English as
-#   the target.
+#   Load config.json and the settings both modes need. Settings is the whole
+#   file, for the shared proxy; Section is its translate section. Returned
+#   Threshold is the Chinese-character ratio above which auto-detection picks
+#   English as the target.
 # ---------------------------------------------------------------------------
 function Get-TranslateCommonConfig {
-    $directory =
-        if ($env:TRANSLATE_CONFIG_DIR) {
-            $env:TRANSLATE_CONFIG_DIR
-        } else {
-            # Not the automatic $HOME: it resolves separately and would drift.
-            Join-Path $env:USERPROFILE '.config\translate'
-        }
-    $directory = Resolve-FileSystemPath $directory
-    $settings = Read-JsonConfigFile (Join-Path $directory 'config.json')
+    $settings = Read-JsonConfigFile (Join-Path (Get-ConfigDirectory) 'config.json')
+    $section = Get-ConfigSection $settings 'translate'
 
-    $thresholdNode = Get-JsonMember $settings 'chineseRatioThreshold'
+    $thresholdNode = Get-JsonMember $section 'chineseRatioThreshold'
     $thresholdText = '0.3'
     if ($null -ne $thresholdNode -and $thresholdNode.Kind -in @('number', 'string')) {
         $thresholdText = $thresholdNode.Value
     } elseif ($null -ne $thresholdNode) {
-        throw 'chineseRatioThreshold must be a number from 0 to 1'
+        throw 'translate.chineseRatioThreshold must be a number from 0 to 1'
     }
 
     # Parsed with the invariant culture so a comma decimal separator in the
@@ -40,12 +33,12 @@ function Get-TranslateCommonConfig {
             [Globalization.CultureInfo]::InvariantCulture,
             [ref]$threshold) -or
         $threshold -lt 0 -or $threshold -gt 1) {
-        throw 'chineseRatioThreshold must be a number from 0 to 1'
+        throw 'translate.chineseRatioThreshold must be a number from 0 to 1'
     }
 
     return [pscustomobject]@{
-        Directory = $directory
         Settings  = $settings
+        Section   = $section
         Threshold = $threshold
     }
 }
@@ -53,22 +46,22 @@ function Get-TranslateCommonConfig {
 # ---------------------------------------------------------------------------
 # Get-TranslateAiSettings <Common> [<ModelOverride>]
 #   Return the model, system prompt and user prompt template for AI mode.
-#   ModelOverride takes precedence over the model named in config.json.
+#   ModelOverride takes precedence over translate.model in config.json.
 # ---------------------------------------------------------------------------
 function Get-TranslateAiSettings($Common, [string] $ModelOverride) {
-    $settings = $Common.Settings
+    $section = $Common.Section
     $selected = $ModelOverride
     if ([string]::IsNullOrWhiteSpace($selected)) {
-        $selection = Get-JsonMember $settings 'model'
+        $selection = Get-JsonMember $section 'model'
         if ($null -eq $selection -or $selection.Kind -ne 'string' -or
             [string]::IsNullOrWhiteSpace($selection.Value)) {
-            throw 'config.json must define model as a non-empty string when -Model is not supplied or is blank'
+            throw 'config.json must define translate.model as a non-empty string when -Model is not supplied or is blank'
         }
 
         $selected = $selection.Value
     }
 
-    $ai = Get-JsonMember $settings 'ai'
+    $ai = Get-JsonMember $section 'ai'
     $systemPrompt = Get-JsonString (Get-JsonMember $ai 'systemPrompt')
     if (-not $systemPrompt) {
         $systemPrompt = 'You are a direct translation engine. Output only the translated text and preserve paragraph breaks.'
@@ -78,7 +71,7 @@ function Get-TranslateAiSettings($Common, [string] $ModelOverride) {
     $userNode = Get-JsonMember $ai 'userPrompt'
     if ($null -ne $userNode) {
         if ($userNode.Kind -ne 'string') {
-            throw 'ai.userPrompt must be a string'
+            throw 'translate.ai.userPrompt must be a string'
         }
 
         if (-not [string]::IsNullOrWhiteSpace($userNode.Value)) {

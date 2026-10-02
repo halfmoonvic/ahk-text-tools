@@ -31,7 +31,7 @@ RegisterTextToolHotkeys()
 RegisterTextToolHotkeys() {
     problems := []
     config := Map()
-    if FileExist(GetConfigRoot() "\ahk\settings.json") {
+    if FileExist(GetConfigRoot() "\settings.json") {
         try config := ReadTextToolConfig()
         catch as err
             problems.Push("settings.json could not be read (" err.Message "); default hotkeys are in use")
@@ -144,7 +144,7 @@ RunSelectedTextTool(title, scriptName, multiEngine := false) {
 
 ReadTextToolConfig(path := "") {
     if path = ""
-        path := GetConfigRoot() "\ahk\settings.json"
+        path := GetConfigRoot() "\settings.json"
     config := Json.Parse(FileRead(path, "UTF-8"))
     if !(config is Map)
         throw Error("Text tools configuration must be a JSON object.")
@@ -162,13 +162,16 @@ ReadToolConfig(multiEngine) {
 }
 
 GetTranslateEngines(config) {
-    if !config.Has("translate") || !(config["translate"] is Array) || !config["translate"].Length
-        throw Error("settings.json: translate must be a nonempty array of engines.")
-    for engine in config["translate"] {
+    engines := ""
+    if config.Has("engines") && config["engines"] is Map && config["engines"].Has("translate")
+        engines := config["engines"]["translate"]
+    if !(engines is Array) || !engines.Length
+        throw Error("settings.json: engines.translate must be a nonempty array of engines.")
+    for engine in engines {
         if Type(engine) != "String" || (engine != "google" && !RegExMatch(engine, "^[^/\s]+/[^\s]+$"))
-            throw Error("Each translate entry must be google or a full provider/model identifier.")
+            throw Error("Each engines.translate entry must be google or a full provider/model identifier.")
     }
-    return config["translate"]
+    return engines
 }
 
 GetPopupUiConfig(config := 0) {
@@ -1311,7 +1314,9 @@ CloseStaticTextPopup(popup) {
     popup.Destroy()
 }
 
+; Must match Get-ConfigDirectory in common\Config.ps1.
 ; Not HOME: it is not a Windows convention and may differ from USERPROFILE.
 GetConfigRoot() {
-    return EnvGet("USERPROFILE") "\.config"
+    directory := EnvGet("TEXT_TOOLS_CONFIG_DIR")
+    return directory != "" ? directory : EnvGet("USERPROFILE") "\.config\text-tools"
 }

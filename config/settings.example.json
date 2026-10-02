@@ -1,5 +1,7 @@
 {
-    "translate": ["google"],
+    "engines": {
+        "translate": ["google"]
+    },
     "hotkeys": {
         "translate": "#!a",
         "kana": "#!s"
@@ -14,11 +16,5 @@
         "maxHeight": 1000,
         "lineHeight": 1,
         "padding": 14
-    },
-    "japanese": {
-        "kana": {
-            "to": "hiragana",
-            "mode": "furigana"
-        }
     }
 }

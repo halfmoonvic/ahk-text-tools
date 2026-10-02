@@ -475,7 +475,7 @@ function Install-Configuration {
     Write-Step "Deploying configuration to $ConfigDir"
 
     $map = @(
-        @{ Template = 'config\ahk\settings.example.json';          Target = 'ahk\settings.json' }
+        @{ Template = 'config\settings.example.json';              Target = 'text-tools\settings.json' }
         @{ Template = 'config\config.example.json';                Target = 'text-tools\config.json' }
         @{ Template = 'config\models.example.json';                Target = 'text-tools\models.json' }
     )

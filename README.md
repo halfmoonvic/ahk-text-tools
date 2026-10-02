@@ -247,8 +247,12 @@ text-tools/
 ├── translate.ps1           <- terminal entry point
 ├── kana.ps1                <- terminal entry point
 ├── ahk/
-│   ├── text.ahk            <- entry point
-│   ├── json.ahk, process.ahk  <- #Include'd by text.ahk
+│   ├── text.ahk            <- entry point: hotkeys and startup
+│   ├── settings.ahk        <- reads settings.json
+│   ├── popup.ahk           <- result window, input box and layout
+│   ├── runner.ahk          <- runs run-batch.ps1 and polls its output
+│   ├── richedit.ahk, theme.ahk
+│   ├── json.ahk, process.ahk
 │   └── run-batch.ps1       <- runs all engines of one tool in one process
 ├── common/                 <- JSON, child process and config helpers
 ├── llm/                    <- streams a prompt through a configured model
@@ -266,6 +270,9 @@ text-tools/
 └── shims/                  <- deployed one level above text-tools/
     └── translate.ps1, kana.ps1
 ```
+
+Only `text.ahk` runs code at startup; the other `.ahk` files are
+`#Include`d by it and only define functions and classes.
 
 Moving `text.ahk` out of `ahk/` breaks it. The shims only forward to the
 scripts of the same name in the `text-tools\` directory beside them.

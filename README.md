@@ -216,7 +216,12 @@ to diagnose a problem without involving AutoHotkey:
 .\translate.ps1 -Text "Hello" -Model openai/gpt-5.6-sol
 "piped input works too" | .\translate.ps1
 .\kana.ps1 -Text "日本語"
+"日本語の文章" | .\kana.ps1
 ```
+
+Both take input from `-Text`, `-InputFile`, the pipeline or stdin, write to
+`-OutputFile` or stdout, and exit with 0 on success, 1 on failure, 2 for
+invalid arguments and 130 when cancelled.
 
 ![Translating a phrase from the command line](docs/cli.gif)
 

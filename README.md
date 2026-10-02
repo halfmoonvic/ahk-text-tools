@@ -230,18 +230,18 @@ invalid arguments and 130 when cancelled.
 
 ## Layout
 
-`text.ahk` finds the other scripts by stripping `\ahk\<file>` from its
-own path, so **this two-level structure is required**:
+`text.ahk` finds the program root by stripping `\ahk\<file>` from its own
+path, and `run-batch.ps1` loads each tool's core from there, so **this
+two-level structure is required**:
 
 ```
 text-tools/
-├── translate.ps1           <- must sit one level above ahk/
-├── kana.ps1
+├── translate.ps1           <- terminal entry point
+├── kana.ps1                <- terminal entry point
 ├── ahk/
 │   ├── text.ahk            <- entry point
 │   ├── json.ahk, proc.ahk  <- #Include'd by text.ahk
-│   ├── run-batch.ps1       <- runs all engines of one tool in one process
-│   └── run-task.ps1        <- wraps the kana child process
+│   └── run-batch.ps1       <- runs all engines of one tool in one process
 ├── common/                 <- JSON, child process and config helpers
 ├── llm/                    <- streams a prompt through a configured model
 │   ├── Llm.Core.psm1

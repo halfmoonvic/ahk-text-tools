@@ -205,8 +205,8 @@ function Invoke-RepositoryUpdate {
 #region stage 1: program files ------------------------------------------------
 
 # text.ahk derives the project root by stripping "\ahk\<file>" from its
-# own path, then looks for translate.ps1 and kana.ps1 there. The two-level
-# layout below is therefore mandatory - do not flatten it.
+# own path, and run-batch.ps1 loads each tool's <tool>\<Tool>.Core.psm1 from
+# there. The two-level layout below is therefore mandatory - do not flatten it.
 # ---------------------------------------------------------------------------
 # Install-ProgramFiles
 #   Copy the scripts into ProgramDir, preserving the repository's directory
@@ -221,7 +221,6 @@ function Install-ProgramFiles {
         'ahk\json.ahk'
         'ahk\proc.ahk'
         'ahk\run-batch.ps1'
-        'ahk\run-task.ps1'
         'translate.ps1'
         'kana.ps1'
         'common\Config.ps1'

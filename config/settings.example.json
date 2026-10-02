@@ -1,6 +1,7 @@
 {
     "engines": {
-        "translate": ["google"]
+        "translate": ["google"],
+        "kana": ["kuroshiro"]
     },
     "hotkeys": {
         "translate": "#!a",

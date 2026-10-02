@@ -20,7 +20,7 @@ OnMessage(0x20, TextToolSearchCursor) ; WM_SETCURSOR
 OnExit(ExitTextTools)
 
 ; Order matters: an earlier action keeps a contested hotkey.
-TextToolHotkeyActions := [
+TextToolActions := [
     {Id: "translate", Default: "#!a", Title: "Translate"},
     {Id: "kana", Default: "#!s", Title: "Japanese Kana"}
 ]
@@ -31,11 +31,9 @@ RegisterTextToolHotkeys()
 RegisterTextToolHotkeys() {
     problems := []
     config := Map()
-    if FileExist(GetConfigRoot() "\settings.json") {
-        try config := ReadTextToolConfig()
-        catch as err
-            problems.Push("settings.json could not be read (" err.Message "); default hotkeys are in use")
-    }
+    try config := ReadTextToolConfig()
+    catch as err
+        problems.Push("settings.json could not be read (" err.Message "); default hotkeys are in use")
     resolved := ResolveTextToolHotkeys(config)
     for problem in resolved.Problems
         problems.Push(problem)
@@ -55,7 +53,7 @@ RegisterTextToolHotkeys() {
 ; An explicit setting that is wrong disables its action rather than falling
 ; back to the default, which may be the very key the user wanted to free.
 ResolveTextToolHotkeys(config) {
-    global TextToolHotkeyActions
+    global TextToolActions
     result := {Bindings: [], Problems: []}
     hotkeys := Map()
     if config.Has("hotkeys") {
@@ -65,7 +63,7 @@ ResolveTextToolHotkeys(config) {
             result.Problems.Push("settings.json: hotkeys must be an object; default hotkeys are in use")
     }
     used := Map()
-    for action in TextToolHotkeyActions {
+    for action in TextToolActions {
         key := action.Default
         if hotkeys.Has(action.Id) {
             value := hotkeys[action.Id]
@@ -88,11 +86,11 @@ ResolveTextToolHotkeys(config) {
         result.Bindings.Push({Action: action, Key: key})
     }
     expected := ""
-    for action in TextToolHotkeyActions
+    for action in TextToolActions
         expected .= (A_Index > 1 ? " or " : "") action.Id
     for name in hotkeys {
         known := false
-        for action in TextToolHotkeyActions
+        for action in TextToolActions
             known := known || action.Id == name
         if !known
             result.Problems.Push("settings.json: hotkeys." name ": unknown action (expected " expected ")")
@@ -123,8 +121,8 @@ CreateTextToolHotkeyCallback(action) {
 
 RunSelectedTextTool(action) {
     try {
-        config := ReadToolConfig(action.Id = "translate")
-        engines := action.Id = "translate" ? GetTranslateEngines(config) : ["kuroshiro"]
+        config := ReadTextToolConfig()
+        engines := GetTextToolEngines(config, action.Id)
     } catch as err {
         ShowStaticPopup(action.Title, err.Message)
         return
@@ -142,34 +140,32 @@ RunSelectedTextTool(action) {
     StartTextToolBatch(action, engines, text, config)
 }
 
-ReadTextToolConfig(path := "") {
-    if path = ""
-        path := GetConfigRoot() "\settings.json"
+ReadTextToolConfig() {
+    path := GetConfigRoot() "\settings.json"
+    if !FileExist(path)
+        return Map()
     config := Json.Parse(FileRead(path, "UTF-8"))
     if !(config is Map)
         throw Error("Text tools configuration must be a JSON object.")
     return config
 }
 
-ReadToolConfig(multiEngine) {
-    ; Only an engine list is required up front; every other tool validates its
-    ; own options and falls back to defaults when the file is missing.
-    if multiEngine
-        return ReadTextToolConfig()
-    try return ReadTextToolConfig()
-    catch
-        return Map()
-}
-
-GetTranslateEngines(config) {
-    engines := ""
-    if config.Has("engines") && config["engines"] is Map && config["engines"].Has("translate")
-        engines := config["engines"]["translate"]
+; A tool without an engine list runs one empty engine name, which the tool's
+; core resolves to its own default. Names are checked only by the core.
+GetTextToolEngines(config, id) {
+    if !config.Has("engines")
+        return [""]
+    if !(config["engines"] is Map)
+        throw Error("settings.json: engines must be an object.")
+    if !config["engines"].Has(id)
+        return [""]
+    engines := config["engines"][id]
     if !(engines is Array) || !engines.Length
-        throw Error("settings.json: engines.translate must be a nonempty array of engines.")
+        throw Error("settings.json: engines." id " must be a nonempty array of engine names.")
+    ; run-batch.ps1 reads the names one per line.
     for engine in engines {
-        if Type(engine) != "String" || (engine != "google" && !RegExMatch(engine, "^[^/\s]+/[^\s]+$"))
-            throw Error("Each engines.translate entry must be google or a full provider/model identifier.")
+        if Type(engine) != "String" || Trim(engine) = "" || RegExMatch(engine, "[\r\n]")
+            throw Error("settings.json: each engines." id " entry must be a nonempty single-line string.")
     }
     return engines
 }
@@ -247,7 +243,7 @@ StartTextToolBatch(action, engines, text, config) {
 
 CreateTextToolWindow(batch, action, engines, config) {
     global TextToolBatches, TextToolViews
-    batch.Scroll := 0, batch.Current := 0, batch.Tool := action.Id, batch.Engines := engines
+    batch.Scroll := 0, batch.Current := 0, batch.Tool := action.Id, batch.Title := action.Title, batch.Engines := engines
     batch.HeaderHeight := 0, batch.UserSized := false, batch.AutoHeight := 0
     batch.Ui := GetPopupUiConfig(config)
     windowFlags := batch.Ui.AlwaysOnTop ? "+AlwaysOnTop " : ""
@@ -297,7 +293,7 @@ CreateTextToolHeader(batch) {
 CreateTextToolRows(batch, engines) {
     for engine in engines {
         task := {Engine: engine, Output: "", Error: ""}
-        task.Label := batch.View.Add("Text", "x12 y12 w400 h32", engine)
+        task.Label := batch.View.Add("Text", "x12 y12 w400 h32", engine != "" ? engine : batch.Title)
         task.Label.SetFont("s" Min(13, batch.Ui.FontSize) " bold")
         task.Status := batch.View.Add("Text", "x12 y44 w400 h30 Right", "Ready")
         task.Status.SetFont("s" batch.SmallFontSize)

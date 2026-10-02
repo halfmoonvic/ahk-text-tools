@@ -155,7 +155,8 @@ Read by the AutoHotkey front-end.
 ```jsonc
 {
   "engines": {
-    "translate": ["google", "openai/gpt-5.6-sol"]  // one panel per entry
+    "translate": ["google", "openai/gpt-5.6-sol"],  // one panel per entry
+    "kana": ["kuroshiro"]
   },
   "hotkeys": {
     "translate": "#!a",         // Win+Alt+A
@@ -175,8 +176,15 @@ Read by the AutoHotkey front-end.
 }
 ```
 
-Each `engines.translate` entry is either `google` (free, no key) or
-`provider/model`, where `provider` matches a key in `models.json`.
+`engines.<tool>` lists the engines a popup runs, one panel each. Without it,
+the popup runs the tool's default engine: `translate.engine` from
+`config.json` for translation, `kuroshiro` for kana. A `translate` entry is
+`google` (free, no key) or `provider/model`, where `provider` matches a key in
+`models.json`; `kana` currently has only `kuroshiro`. A misspelt engine is
+reported in its own panel.
+
+A missing `settings.json` means all defaults. One that exists but cannot be
+read is reported in a popup when you press a hotkey.
 
 `hotkeys` values use AutoHotkey v2 [hotkey syntax](https://www.autohotkey.com/docs/v2/Hotkeys.htm):
 `#` is Win, `!` Alt, `^` Ctrl and `+` Shift, so `#!a` is <kbd>Win</kbd>+<kbd>Alt</kbd>+<kbd>A</kbd>;

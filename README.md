@@ -242,8 +242,10 @@ text-tools/
 │   ├── Translate.Core.psm1
 │   ├── lib/
 │   └── google              <- third-party, see THIRD_PARTY.md
-├── kana/
-│   ├── kana.mjs
+├── kana/                   <- kana annotation
+│   ├── Kana.Core.psm1
+│   ├── lib/
+│   ├── kana.mjs            <- the converter, run under Node.js
 │   └── vendor/             <- fetched by deploy.ps1, not in git
 └── shims/                  <- deployed one level above text-tools/
     └── translate.ps1, kana.ps1

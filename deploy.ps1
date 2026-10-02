@@ -239,7 +239,10 @@ function Install-ProgramFiles {
         'translate\lib\Config.ps1'
         'translate\lib\Google.ps1'
         'translate\lib\google-launch.sh'
+        'kana\Kana.Core.psm1'
         'kana\kana.mjs'
+        'kana\lib\Config.ps1'
+        'kana\lib\Kuroshiro.ps1'
     )
 
     foreach ($file in $files) {

@@ -25,7 +25,7 @@ function Resolve-FileSystemPath([string] $Path) {
 # Get-ConfigDirectory
 #   Return the directory holding config.json, models.json and auth.json:
 #   TEXT_TOOLS_CONFIG_DIR when set, otherwise %USERPROFILE%\.config\text-tools.
-#   kana.ps1 and text.ahk resolve the same directory on their own.
+#   text.ahk resolves the same directory on its own.
 # ---------------------------------------------------------------------------
 function Get-ConfigDirectory {
     $directory =

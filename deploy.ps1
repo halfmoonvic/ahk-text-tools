@@ -11,15 +11,17 @@
 
 .EXAMPLE
     .\deploy.ps1
-    Install (or refresh) into ~\.local\bin with configuration in ~\.config.
+    Install (or refresh) into ~\.local\bin\text-tools, with translate.ps1 and
+    kana.ps1 shims in ~\.local\bin and configuration in ~\.config.
 
 .EXAMPLE
     .\deploy.ps1 -Update
     Pull the latest commits, then deploy.
 
 .EXAMPLE
-    .\deploy.ps1 -TargetDir D:\tools\text-tools
-    Install the program files elsewhere; configuration still goes to ~\.config.
+    .\deploy.ps1 -TargetDir D:\tools
+    Install into D:\tools\text-tools with the shims in D:\tools; configuration
+    still goes to ~\.config.
 #>
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
@@ -44,6 +46,8 @@ if ($PSVersionTable.PSVersion.Major -lt 6) {
 }
 
 $RepoRoot = $PSScriptRoot
+# The shims find the program by this fixed name next to them.
+$ProgramDir = Join-Path $TargetDir 'text-tools'
 # Not a parameter: text.ahk, kana.ps1 and translate read configuration only from here.
 $ConfigDir = Join-Path $env:USERPROFILE '.config'
 $script:Stats = [ordered]@{ Created = 0; Updated = 0; Unchanged = 0; Skipped = 0 }
@@ -190,11 +194,12 @@ function Invoke-RepositoryUpdate {
 # layout below is therefore mandatory - do not flatten it.
 # ---------------------------------------------------------------------------
 # Install-ProgramFiles
-#   Copy the scripts into TargetDir, preserving the repository's directory
-#   layout for the reason described above.
+#   Copy the scripts into ProgramDir, preserving the repository's directory
+#   layout for the reason described above, then put the terminal shims in
+#   TargetDir.
 # ---------------------------------------------------------------------------
 function Install-ProgramFiles {
-    Write-Step "Deploying program files to $TargetDir"
+    Write-Step "Deploying program files to $ProgramDir"
 
     $files = @(
         'ahk\text.ahk'
@@ -223,7 +228,11 @@ function Install-ProgramFiles {
     )
 
     foreach ($file in $files) {
-        Copy-IfDifferent (Join-Path $RepoRoot $file) (Join-Path $TargetDir $file) $file
+        Copy-IfDifferent (Join-Path $RepoRoot $file) (Join-Path $ProgramDir $file) $file
+    }
+
+    foreach ($shim in 'translate.ps1', 'kana.ps1') {
+        Copy-IfDifferent (Join-Path $RepoRoot "shims\$shim") (Join-Path $TargetDir $shim) "shim $shim"
     }
 
     Write-Host "    $($script:Stats.Unchanged) unchanged, $($script:Stats.Created) created, $($script:Stats.Updated) updated"
@@ -302,7 +311,7 @@ function Expand-NpmPackage([string] $Name, [string] $Destination) {
 function Install-KanaVendor {
     Write-Step 'Checking kana vendor files'
 
-    $vendorRoot = Join-Path $TargetDir 'kana\vendor'
+    $vendorRoot = Join-Path $ProgramDir 'kana\vendor'
     $missing = @(if ($Force) { $script:VendorFiles } else { Get-MissingVendorFile $vendorRoot })
 
     if ($missing.Count -eq 0) {
@@ -509,7 +518,7 @@ if ($script:Warnings.Count -gt 0) {
 }
 
 $authPath = Join-Path $ConfigDir 'translate\auth.json'
-$entryPoint = Join-Path $TargetDir 'ahk\text.ahk'
+$entryPoint = Join-Path $ProgramDir 'ahk\text.ahk'
 
 Write-Host ''
 Write-Host 'Next steps:' -ForegroundColor White

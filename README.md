@@ -33,12 +33,14 @@ cd text-tools
 .\deploy.ps1
 ```
 
-That copies the program files to `~\.local\bin`, downloads the Japanese
-dictionary data, and writes starter configuration to `~\.config`. Then:
+That copies the program files to `~\.local\bin\text-tools`, puts small
+`translate.ps1` and `kana.ps1` shims in `~\.local\bin` for the command line,
+downloads the Japanese dictionary data, and writes starter configuration to
+`~\.config`. Then:
 
 1. If you want AI translation, put your API keys in `~\.config\translate\auth.json`.
    Skip this if you only use the free `google` engine.
-2. Run `~\.local\bin\ahk\text.ahk`.
+2. Run `~\.local\bin\text-tools\ahk\text.ahk`.
 3. Select some text and press <kbd>Win</kbd>+<kbd>Alt</kbd>+<kbd>A</kbd> (the default).
 
 To start it automatically, put a shortcut to `text.ahk` in your Startup folder
@@ -50,7 +52,7 @@ Re-run it any time; it only writes what actually changed.
 
 | Option | Effect |
 | --- | --- |
-| `-TargetDir <path>` | Where program files go (default `~\.local\bin`) |
+| `-TargetDir <path>` | Where the shims go (default `~\.local\bin`); the program goes in its `text-tools\` |
 | `-Update` | `git pull --ff-only` first, then deploy |
 | `-SkipVendor` | Don't download the Japanese dictionary data |
 | `-Force` | Overwrite customised config (backs it up first) and re-download vendor files |
@@ -187,12 +189,15 @@ text-tools/
 │   ├── Translate.Core.psm1
 │   ├── lib/
 │   └── google              <- third-party, see THIRD_PARTY.md
-└── kana/
-    ├── kana.mjs
-    └── vendor/             <- fetched by deploy.ps1, not in git
+├── kana/
+│   ├── kana.mjs
+│   └── vendor/             <- fetched by deploy.ps1, not in git
+└── shims/                  <- deployed one level above text-tools/
+    └── translate.ps1, kana.ps1
 ```
 
-Moving `text.ahk` out of `ahk/` breaks it.
+Moving `text.ahk` out of `ahk/` breaks it. The shims only forward to the
+scripts of the same name in the `text-tools\` directory beside them.
 
 ## License
 

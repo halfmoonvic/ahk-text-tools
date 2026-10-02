@@ -8,7 +8,8 @@
     dictionary files must be present; deploy.ps1 installs them.
 
     Reading direction and output style come from the kana section of
-    ~/.config/text-tools/config.json, falling back to hiragana furigana.
+    ~/.config/text-tools/config.json; a missing value means hiragana
+    furigana.
 
 .EXAMPLE
     .\kana.ps1 -Text '<japanese text>'

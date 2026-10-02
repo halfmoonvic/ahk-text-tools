@@ -141,9 +141,9 @@ Both fall back to built-in defaults when missing or empty; a `userPrompt`
 that is not a string is an error. The `google` engine uses neither.
 
 `kana.to` picks the reading script — `hiragana`, `katakana`, or `romaji`.
-`kana.mode` is `ruby` for HTML `<ruby>` markup, or anything else
-(conventionally `furigana`) for the plain `日本語（にほんご）` form. A missing or
-unreadable file falls back to hiragana furigana.
+`kana.mode` is `furigana` for the plain `日本語（にほんご）` form, or `ruby` for
+HTML `<ruby>` markup. A missing or `null` value takes the default, hiragana
+furigana; any other value is an error.
 
 ### `settings.json`
 

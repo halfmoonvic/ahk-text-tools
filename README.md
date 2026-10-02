@@ -109,7 +109,7 @@ the AutoHotkey front-end all honour it, and so does `deploy.ps1`.
     "connectTimeoutSeconds": 10
   },
   "translate": {
-    "model": "deepseek/deepseek-v4-flash",   // used when -Model is not given
+    "engine": "deepseek/deepseek-v4-flash",  // used when -Engine is not given
     "chineseRatioThreshold": 0.3,
     "ai": { "systemPrompt": "...", "userPrompt": "..." }
   },
@@ -125,6 +125,9 @@ connecting to the provider — the DNS lookup and the TCP and TLS handshakes. It
 does not limit how long a response may take. Thinking levels are `off`, `low`,
 `medium` or `high`; `modelThinkingLevels` overrides `defaultThinkingLevel` for
 one `provider/model`.
+
+`translate.engine` is the engine the command line uses when `-Engine` is not
+given: `google` or a `provider/model`.
 
 `translate.chineseRatioThreshold` (0 to 1) is the share of Chinese characters
 at which automatic detection translates into English instead of Chinese.
@@ -212,8 +215,8 @@ to diagnose a problem without involving AutoHotkey:
 
 ```powershell
 .\translate.ps1 -Text "Hello world"
-.\translate.ps1 -Text "你好" -Mode google
-.\translate.ps1 -Text "Hello" -Model openai/gpt-5.6-sol
+.\translate.ps1 -Text "你好" -Engine google
+.\translate.ps1 -Text "Hello" -Engine openai/gpt-5.6-sol
 "piped input works too" | .\translate.ps1
 .\kana.ps1 -Text "日本語"
 "日本語の文章" | .\kana.ps1

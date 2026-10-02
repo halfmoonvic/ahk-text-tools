@@ -3,7 +3,7 @@
 # Imported by translate.ps1 and by the AutoHotkey front-end through
 # run-batch.ps1. Invoke-Translate is the only exported command.
 #
-# AI mode goes through the llm module. It loads its own copy of the common
+# AI engines go through the llm module. It loads its own copy of the common
 # files, so only strings and plain objects may cross into it, never a parsed
 # JSON node: the two copies define separate StrictJsonNode types.
 
@@ -23,22 +23,22 @@ foreach ($file in @(
 Import-Module (Join-Path $PSScriptRoot '../llm/Llm.Core.psm1') -ErrorAction Stop
 
 # ---------------------------------------------------------------------------
-# Invoke-Translate -Text <Text> [-OutputFile] [-Model] [-Mode] [-Target]
+# Invoke-Translate -Text <Text> [-OutputFile] [-Engine] [-Target]
 #                  [-CancellationToken]
 #   Translate Text and stream the result to OutputFile, or to stdout when
 #   OutputFile is empty.
 #
-#   Mode 'ai' goes through a configured provider; 'google' shells out to the
-#   vendored Translate Shell script and accepts no Model. Target 'auto' picks
-#   the direction from the ratio of Chinese to Latin characters in Text.
+#   Engine 'google' shells out to the vendored Translate Shell script; any
+#   other engine is a provider/model configured for the llm module. An empty
+#   Engine means translate.engine from config.json. Target 'auto' picks the
+#   direction from the ratio of Chinese to Latin characters in Text.
 # ---------------------------------------------------------------------------
 function Invoke-Translate {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory=$true)][string] $Text,
         [string] $OutputFile,
-        [string] $Model,
-        [ValidateSet('ai','google')][string] $Mode = 'ai',
+        [string] $Engine,
         [ValidateSet('auto','zh','en')][string] $Target = 'auto',
         [Threading.CancellationToken] $CancellationToken = [Threading.CancellationToken]::None
     )
@@ -47,44 +47,35 @@ function Invoke-Translate {
         throw 'no input text provided'
     }
 
-    if ($Mode -eq 'google') {
-        if (-not [string]::IsNullOrEmpty($Model)) {
-            throw 'google does not accept Model'
-        }
-
-        $common = Get-TranslateCommonConfig
-        if ($Target -eq 'auto') {
-            $Target = Get-DetectedTarget $Text $common.Threshold
-        }
-
-        if ($OutputFile) {
-            $OutputFile = Resolve-FileSystemPath $OutputFile
-        }
-
-        Invoke-GoogleTranslate $Text $Target $OutputFile $common $CancellationToken
-        return
+    $common = Get-TranslateCommonConfig
+    if ([string]::IsNullOrWhiteSpace($Engine)) {
+        $Engine = Get-TranslateDefaultEngine $common
     }
 
-    $common = Get-TranslateCommonConfig
-    $settings = Get-TranslateAiSettings $common $Model
     if ($Target -eq 'auto') {
         $Target = Get-DetectedTarget $Text $common.Threshold
     }
 
+    if ($OutputFile) {
+        $OutputFile = Resolve-FileSystemPath $OutputFile
+    }
+
+    if ($Engine -ceq 'google') {
+        Invoke-GoogleTranslate $Text $Target $OutputFile $common $CancellationToken
+        return
+    }
+
+    $prompts = Get-TranslatePrompts $common
     $language =
         if ($Target -eq 'en') {
             'English'
         } else {
             'Simplified Chinese'
         }
-    $prompt = New-TranslatePrompt $settings.UserPrompt $language $Text
+    $prompt = New-TranslatePrompt $prompts.UserPrompt $language $Text
 
-    if ($OutputFile) {
-        $OutputFile = Resolve-FileSystemPath $OutputFile
-    }
-
-    Invoke-LlmStream -Model $settings.Model `
-        -SystemPrompt $settings.SystemPrompt -Prompt $prompt `
+    Invoke-LlmStream -Model $Engine `
+        -SystemPrompt $prompts.SystemPrompt -Prompt $prompt `
         -OutputFile $OutputFile -CancellationToken $CancellationToken
 }
 

@@ -26,12 +26,7 @@ $translateEngine = {
     $exitCode = 1
     try {
         Import-Module $Module
-        if ($Engine -eq 'google') {
-            Invoke-Translate -Text $Text -OutputFile "$Prefix.out" -Mode google
-        } else {
-            Invoke-Translate -Text $Text -OutputFile "$Prefix.out" -Model $Engine
-        }
-
+        Invoke-Translate -Text $Text -OutputFile "$Prefix.out" -Engine $Engine
         $exitCode = 0
     } catch {
         [IO.File]::WriteAllText("$Prefix.err", 'translate: ' + $_.Exception.Message, $utf8)

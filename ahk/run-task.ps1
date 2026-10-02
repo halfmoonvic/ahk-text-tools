@@ -6,9 +6,7 @@
 param(
     [Parameter(Mandatory=$true)][string] $Script,
     [Parameter(Mandatory=$true)][string] $InputFile,
-    [Parameter(Mandatory=$true)][string] $OutputFile,
-    [string] $Mode,
-    [string] $Model
+    [Parameter(Mandatory=$true)][string] $OutputFile
 )
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
@@ -17,16 +15,7 @@ $OutputEncoding = [Console]::OutputEncoding
 $env:TEMP = [IO.Path]::GetDirectoryName($OutputFile)
 $env:TMP = $env:TEMP
 try {
-    $arguments = @{ InputFile=$InputFile; OutputFile=$OutputFile }
-    if ($Mode) {
-        $arguments.Mode = $Mode
-    }
-
-    if ($Model) {
-        $arguments.Model = $Model
-    }
-
-    & $Script @arguments
+    & $Script -InputFile $InputFile -OutputFile $OutputFile
     exit $LASTEXITCODE
 } catch {
     [Console]::Error.WriteLine($_.Exception.Message)

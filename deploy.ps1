@@ -578,10 +578,11 @@ function New-MigratedConfig {
     }
 
     $translate = [ordered]@{}
-    foreach ($name in 'model', 'chineseRatioThreshold') {
-        if ($top.Contains($name)) {
-            $translate[$name] = $top[$name]
-        }
+    if ($top.Contains('model')) {
+        $translate['engine'] = $top['model']
+    }
+    if ($top.Contains('chineseRatioThreshold')) {
+        $translate['chineseRatioThreshold'] = $top['chineseRatioThreshold']
     }
     $ai = Select-JsonMember $top['ai'] @('systemPrompt', 'userPrompt') $unknown 'ai.'
     if ($ai.Count -gt 0) {

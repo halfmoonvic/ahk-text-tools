@@ -2,11 +2,11 @@
 #
 # Dot-sourced by Translate.Core.psm1. The settings read here are the translate
 # section of config.json in Get-ConfigDirectory; the llm module reads the
-# model configuration from the same directory on its own.
+# provider configuration from the same directory on its own.
 
 # ---------------------------------------------------------------------------
 # Get-TranslateCommonConfig
-#   Load config.json and the settings both modes need. Settings is the whole
+#   Load config.json and the settings every engine needs. Settings is the whole
 #   file, for the shared proxy; Section is its translate section. Returned
 #   Threshold is the Chinese-character ratio above which auto-detection picks
 #   English as the target.
@@ -44,24 +44,25 @@ function Get-TranslateCommonConfig {
 }
 
 # ---------------------------------------------------------------------------
-# Get-TranslateAiSettings <Common> [<ModelOverride>]
-#   Return the model, system prompt and user prompt template for AI mode.
-#   ModelOverride takes precedence over translate.model in config.json.
+# Get-TranslateDefaultEngine <Common>
+#   Return translate.engine, the engine used when none is given.
 # ---------------------------------------------------------------------------
-function Get-TranslateAiSettings($Common, [string] $ModelOverride) {
-    $section = $Common.Section
-    $selected = $ModelOverride
-    if ([string]::IsNullOrWhiteSpace($selected)) {
-        $selection = Get-JsonMember $section 'model'
-        if ($null -eq $selection -or $selection.Kind -ne 'string' -or
-            [string]::IsNullOrWhiteSpace($selection.Value)) {
-            throw 'config.json must define translate.model as a non-empty string when -Model is not supplied or is blank'
-        }
-
-        $selected = $selection.Value
+function Get-TranslateDefaultEngine($Common) {
+    $engine = Get-JsonMember $Common.Section 'engine'
+    if ($null -eq $engine -or $engine.Kind -ne 'string' -or
+        [string]::IsNullOrWhiteSpace($engine.Value)) {
+        throw 'config.json must define translate.engine as a non-empty string when -Engine is not given'
     }
 
-    $ai = Get-JsonMember $section 'ai'
+    return [string]$engine.Value
+}
+
+# ---------------------------------------------------------------------------
+# Get-TranslatePrompts <Common>
+#   Return the system prompt and user prompt template for an AI engine.
+# ---------------------------------------------------------------------------
+function Get-TranslatePrompts($Common) {
+    $ai = Get-JsonMember $Common.Section 'ai'
     $systemPrompt = Get-JsonString (Get-JsonMember $ai 'systemPrompt')
     if (-not $systemPrompt) {
         $systemPrompt = 'You are a direct translation engine. Output only the translated text and preserve paragraph breaks.'
@@ -80,7 +81,6 @@ function Get-TranslateAiSettings($Common, [string] $ModelOverride) {
     }
 
     return [pscustomobject]@{
-        Model        = $selected
         SystemPrompt = $systemPrompt
         UserPrompt   = $userPrompt
     }

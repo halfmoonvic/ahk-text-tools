@@ -1,4 +1,4 @@
-# Google.ps1 - Google mode, driven through the vendored Translate Shell script.
+# Google.ps1 - the google engine, driven through the vendored Translate Shell script.
 #
 # Dot-sourced by Translate.Core.psm1. Unlike the AI adapters this path shells out
 # to `translate/google` (a gawk program) under Git Bash rather than calling an
@@ -9,7 +9,7 @@
 # Get-GitBash
 #   Locate bash.exe from Git for Windows, preferring the standard install
 #   locations and falling back to the registry. Throws when Git is absent,
-#   since Google mode cannot run without it.
+#   since the google engine cannot run without it.
 # ---------------------------------------------------------------------------
 function Get-GitBash {
     $candidates = @(
@@ -30,7 +30,7 @@ function Get-GitBash {
         }
     }
 
-    throw 'Google mode requires Git for Windows Bash; install Git for Windows with gawk'
+    throw 'the google engine requires Git for Windows Bash; install Git for Windows with gawk'
 }
 
 # ---------------------------------------------------------------------------
@@ -110,7 +110,7 @@ function Invoke-GoogleTranslate([string] $Text, [string] $Target, [string] $Outp
 
         if ($process.ExitCode -ne 0) {
             if ($process.ExitCode -eq 127) {
-                throw 'Google mode requires Git Bash with gawk and cygpath installed'
+                throw 'the google engine requires Git Bash with gawk and cygpath installed'
             }
 
             throw "Google Shell failed (exit $($process.ExitCode)): $($errorText.Trim())"

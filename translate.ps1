@@ -6,9 +6,10 @@
     Takes input from -Text, -InputFile, the pipeline, or stdin -- exactly one
     of them -- and streams the translation to -OutputFile or stdout.
 
-    Mode 'ai' uses a provider configured in ~/.config/text-tools; mode 'google'
-    shells out to the vendored Translate Shell script and needs no API key.
-    Target 'auto' picks the direction from the ratio of Chinese to Latin
+    Engine 'google' shells out to the vendored Translate Shell script and needs
+    no API key; any other engine is a provider/model configured in
+    ~/.config/text-tools. Without -Engine, translate.engine in config.json is
+    used. Target 'auto' picks the direction from the ratio of Chinese to Latin
     characters in the input.
 
     Exit codes: 0 success, 1 failure, 2 invalid arguments, 130 cancelled.
@@ -22,7 +23,7 @@
     Translate piped input, forcing English output.
 
 .EXAMPLE
-    .\translate.ps1 -InputFile in.txt -OutputFile out.txt -Mode google
+    .\translate.ps1 -InputFile in.txt -OutputFile out.txt -Engine google
     Translate a file without using an API key.
 #>
 [CmdletBinding()]
@@ -31,8 +32,7 @@ param(
     [AllowEmptyString()][string] $Text,
     [string] $InputFile,
     [string] $OutputFile,
-    [string] $Model,
-    [string] $Mode = 'ai',
+    [string] $Engine,
     [string] $Target = 'auto',
     # Separate pipeline binding avoids overwriting explicitly supplied Text.
     [Parameter(ValueFromPipeline = $true, DontShow = $true)]
@@ -60,10 +60,9 @@ end {
     $translateExitCode = 130
     try {
         if ($RemainingArguments.Count -gt 0 -or $Target -cnotin @('auto','zh','en') -or
-            $Mode -cnotin @('ai','google') -or ($Mode -eq 'google' -and -not [string]::IsNullOrEmpty($Model)) -or
             ([int]$explicitText + [int]$hasInputFile + [int]$hasPipeline) -gt 1) {
             $translateExitCode = 2
-            throw 'invalid arguments: choose one input source; Target must be auto, zh, or en; Mode must be ai or google; google does not accept Model'
+            throw 'invalid arguments: choose one input source; Target must be auto, zh, or en'
         }
 
         # ---------------------------------------------------------------
@@ -115,7 +114,7 @@ end {
                 ''
             }
         Import-Module (Join-Path $PSScriptRoot 'translate\Translate.Core.psm1') -Force -ErrorAction Stop
-        Invoke-Translate -Text $source -OutputFile $outputPath -Model $Model -Target $Target -Mode $Mode
+        Invoke-Translate -Text $source -OutputFile $outputPath -Engine $Engine -Target $Target
         $translateExitCode = 0
     } catch [System.Management.Automation.PipelineStoppedException] {
         $translateExitCode = 130

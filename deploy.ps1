@@ -12,7 +12,7 @@
 .EXAMPLE
     .\deploy.ps1
     Install (or refresh) into ~\.local\bin\text-tools, with translate.ps1 and
-    kana.ps1 shims in ~\.local\bin and configuration in ~\.config\text-tools.
+    kana.ps1 in ~\.local\bin and configuration in ~\.config\text-tools.
     Configuration from the older ~\.config\translate and ~\.config\ahk layout
     is migrated into any file that does not exist yet.
 
@@ -22,8 +22,8 @@
 
 .EXAMPLE
     .\deploy.ps1 -TargetDir D:\tools
-    Install into D:\tools\text-tools with the shims in D:\tools; configuration
-    still goes to ~\.config\text-tools.
+    Install into D:\tools\text-tools with translate.ps1 and kana.ps1 in
+    D:\tools; configuration still goes to ~\.config\text-tools.
 #>
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
@@ -48,7 +48,7 @@ if ($PSVersionTable.PSVersion.Major -lt 6) {
 }
 
 $RepoRoot = $PSScriptRoot
-# The shims find the program by this fixed name next to them.
+# The entry scripts find the program by this fixed name next to them.
 $ProgramDir = Join-Path $TargetDir 'text-tools'
 # Not a parameter: it must be the directory the tools read, so it follows
 # Get-ConfigDirectory in common\Config.ps1.
@@ -210,8 +210,8 @@ function Invoke-RepositoryUpdate {
 # ---------------------------------------------------------------------------
 # Install-ProgramFiles
 #   Copy the scripts into ProgramDir, preserving the repository's directory
-#   layout for the reason described above, then put the terminal shims in
-#   TargetDir.
+#   layout for the reason described above, then put the terminal entry
+#   scripts in TargetDir.
 # ---------------------------------------------------------------------------
 function Install-ProgramFiles {
     Write-Step "Deploying program files to $ProgramDir"
@@ -226,8 +226,6 @@ function Install-ProgramFiles {
         'ahk\richedit.ahk'
         'ahk\theme.ahk'
         'ahk\run-batch.ps1'
-        'translate.ps1'
-        'kana.ps1'
         'common\Config.ps1'
         'common\Json.ps1'
         'common\Process.ps1'
@@ -253,8 +251,8 @@ function Install-ProgramFiles {
         Copy-IfDifferent (Join-Path $RepoRoot $file) (Join-Path $ProgramDir $file) $file
     }
 
-    foreach ($shim in 'translate.ps1', 'kana.ps1') {
-        Copy-IfDifferent (Join-Path $RepoRoot "shims\$shim") (Join-Path $TargetDir $shim) "shim $shim"
+    foreach ($entry in 'translate.ps1', 'kana.ps1') {
+        Copy-IfDifferent (Join-Path $RepoRoot "bin\$entry") (Join-Path $TargetDir $entry) $entry
     }
 
     Write-Host "    $($script:Stats.Unchanged) unchanged, $($script:Stats.Created) created, $($script:Stats.Updated) updated"

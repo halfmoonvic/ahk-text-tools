@@ -33,8 +33,8 @@ cd text-tools
 .\deploy.ps1
 ```
 
-That copies the program files to `~\.local\bin\text-tools`, puts small
-`translate.ps1` and `kana.ps1` shims in `~\.local\bin` for the command line,
+That copies the program files to `~\.local\bin\text-tools`, puts the
+`translate.ps1` and `kana.ps1` commands in `~\.local\bin` for the command line,
 downloads the Japanese dictionary data, and writes starter configuration to
 `~\.config\text-tools`. Then:
 
@@ -52,7 +52,7 @@ Re-run it any time; it only writes what actually changed.
 
 | Option | Effect |
 | --- | --- |
-| `-TargetDir <path>` | Where the shims go (default `~\.local\bin`); the program goes in its `text-tools\` |
+| `-TargetDir <path>` | Where `translate.ps1` and `kana.ps1` go (default `~\.local\bin`); the program goes in its `text-tools\` |
 | `-Update` | `git pull --ff-only` first, then deploy |
 | `-SkipVendor` | Don't download the Japanese dictionary data |
 | `-Force` | Overwrite customised config (backs it up first) and re-download vendor files |
@@ -222,12 +222,12 @@ The translator and kana converter work on their own, which is the quickest way
 to diagnose a problem without involving AutoHotkey:
 
 ```powershell
-.\translate.ps1 -Text "Hello world"
-.\translate.ps1 -Text "你好" -Engine google
-.\translate.ps1 -Text "Hello" -Engine openai/gpt-5.6-sol
-"piped input works too" | .\translate.ps1
-.\kana.ps1 -Text "日本語"
-"日本語の文章" | .\kana.ps1
+.\bin\translate.ps1 -Text "Hello world"
+.\bin\translate.ps1 -Text "你好" -Engine google
+.\bin\translate.ps1 -Text "Hello" -Engine openai/gpt-5.6-sol
+"piped input works too" | .\bin\translate.ps1
+.\bin\kana.ps1 -Text "日本語"
+"日本語の文章" | .\bin\kana.ps1
 ```
 
 Both take input from `-Text`, `-InputFile`, the pipeline or stdin, write to
@@ -244,8 +244,8 @@ two-level structure is required**:
 
 ```
 text-tools/
-├── translate.ps1           <- terminal entry point
-├── kana.ps1                <- terminal entry point
+├── bin/                    <- terminal entry points, deployed beside text-tools/
+│   └── translate.ps1, kana.ps1
 ├── ahk/
 │   ├── text.ahk            <- entry point: hotkeys and startup
 │   ├── settings.ahk        <- reads settings.json
@@ -262,20 +262,19 @@ text-tools/
 │   ├── Translate.Core.psm1
 │   ├── lib/
 │   └── google              <- third-party, see THIRD_PARTY.md
-├── kana/                   <- kana annotation
-│   ├── Kana.Core.psm1
-│   ├── lib/
-│   ├── kana.mjs            <- the converter, run under Node.js
-│   └── vendor/             <- fetched by deploy.ps1, not in git
-└── shims/                  <- deployed one level above text-tools/
-    └── translate.ps1, kana.ps1
+└── kana/                   <- kana annotation
+    ├── Kana.Core.psm1
+    ├── lib/
+    ├── kana.mjs            <- the converter, run under Node.js
+    └── vendor/             <- fetched by deploy.ps1, not in git
 ```
 
 Only `text.ahk` runs code at startup; the other `.ahk` files are
 `#Include`d by it and only define functions and classes.
 
-Moving `text.ahk` out of `ahk/` breaks it. The shims only forward to the
-scripts of the same name in the `text-tools\` directory beside them.
+Moving `text.ahk` out of `ahk/` breaks it. The `bin/` scripts load their
+tool's core from the `text-tools\` directory beside them once deployed, or from
+the repository when run from `bin/` here.
 
 ## License
 

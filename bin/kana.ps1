@@ -1,30 +1,32 @@
 <#
 .SYNOPSIS
-    Translates text between Chinese and English.
+    Annotates Japanese text with kana readings.
 
 .DESCRIPTION
     Takes input from -Text, -InputFile, the pipeline, or stdin -- exactly one
-    of them -- and streams the translation to -OutputFile or stdout.
+    of them -- and writes the annotated text to -OutputFile or stdout.
 
-    Engine 'google' shells out to the vendored Translate Shell script and needs
-    no API key; any other engine is a provider/model configured in
-    ~/.config/text-tools. Without -Engine, translate.engine in config.json is
-    used. Target 'auto' picks the direction from the ratio of Chinese to Latin
-    characters in the input.
+    Runs the kana tool in kana\Kana.Core.psm1, which wraps the bundled
+    kana/kana.mjs converter (kuroshiro and kuromoji). Node.js and the vendored
+    dictionary files must be present; deploy.ps1 installs them.
+
+    Reading direction and output style come from the kana section of
+    ~/.config/text-tools/config.json; a missing value means hiragana
+    furigana.
 
     Exit codes: 0 success, 1 failure, 2 invalid arguments, 130 cancelled.
 
 .EXAMPLE
-    .\translate.ps1 -Text 'hello world'
-    Translate one string to stdout.
+    .\kana.ps1 -Text '<japanese text>'
+    Write the annotated text to stdout.
 
 .EXAMPLE
-    Get-Content notes.txt | .\translate.ps1 -Target en
-    Translate piped input, forcing English output.
+    Get-Content notes.txt | .\kana.ps1
+    Annotate piped input.
 
 .EXAMPLE
-    .\translate.ps1 -InputFile in.txt -OutputFile out.txt -Engine google
-    Translate a file without using an API key.
+    .\kana.ps1 -InputFile in.txt -OutputFile out.txt
+    Read from a file and write the result to another.
 #>
 [CmdletBinding()]
 param(
@@ -32,8 +34,6 @@ param(
     [AllowEmptyString()][string] $Text,
     [string] $InputFile,
     [string] $OutputFile,
-    [string] $Engine,
-    [string] $Target = 'auto',
     # Separate pipeline binding avoids overwriting explicitly supplied Text.
     [Parameter(ValueFromPipeline = $true, DontShow = $true)]
     [AllowEmptyString()][AllowNull()][string] $PipelineText,
@@ -57,12 +57,12 @@ process {
 }
 end {
     $ErrorActionPreference = 'Stop'
-    $translateExitCode = 130
+    $kanaExitCode = 130
     try {
-        if ($RemainingArguments.Count -gt 0 -or $Target -cnotin @('auto','zh','en') -or
+        if ($RemainingArguments.Count -gt 0 -or
             ([int]$explicitText + [int]$hasInputFile + [int]$hasPipeline) -gt 1) {
-            $translateExitCode = 2
-            throw 'invalid arguments: choose one input source; Target must be auto, zh, or en'
+            $kanaExitCode = 2
+            throw 'invalid arguments: choose one input source'
         }
 
         # ---------------------------------------------------------------
@@ -113,25 +113,30 @@ end {
             } else {
                 ''
             }
-        Import-Module (Join-Path $PSScriptRoot 'translate\Translate.Core.psm1') -Force -ErrorAction Stop
-        Invoke-Translate -Text $source -OutputFile $outputPath -Engine $Engine -Target $Target
-        $translateExitCode = 0
+        # Deployed beside text-tools\; in the repository, one level below the tool folders.
+        $core = Join-Path $PSScriptRoot 'text-tools\kana\Kana.Core.psm1'
+        if (-not (Test-Path -LiteralPath $core)) {
+            $core = Join-Path $PSScriptRoot '..\kana\Kana.Core.psm1'
+        }
+        Import-Module $core -Force -ErrorAction Stop
+        Invoke-Kana -Text $source -OutputFile $outputPath
+        $kanaExitCode = 0
     } catch [System.Management.Automation.PipelineStoppedException] {
-        $translateExitCode = 130
+        $kanaExitCode = 130
     } catch [System.OperationCanceledException] {
-        $translateExitCode = 130
+        $kanaExitCode = 130
     } catch {
-        if ($translateExitCode -ne 2) {
-            $translateExitCode = 1
+        if ($kanaExitCode -ne 2) {
+            $kanaExitCode = 1
         }
 
-        [Console]::Error.WriteLine('translate: ' + $_.Exception.Message)
+        [Console]::Error.WriteLine('kana: ' + $_.Exception.Message)
     } finally {
         # PowerShell also runs finally when Ctrl+C stops the pipeline.
         # Windows PowerShell can overwrite a stopped -File pipeline's exit with
         # zero. Only terminate the standalone host after module cleanup finishes;
         # an invocation inside an existing interactive host must keep that host.
-        if ($translateExitCode -eq 130) {
+        if ($kanaExitCode -eq 130) {
             $hostArguments = [Environment]::GetCommandLineArgs()
             for ($argumentIndex = 0; $argumentIndex -lt $hostArguments.Length - 1; $argumentIndex++) {
                 if ($hostArguments[$argumentIndex] -ieq '-File') {
@@ -145,6 +150,6 @@ end {
             }
         }
 
-        exit $translateExitCode
+        exit $kanaExitCode
     }
 }

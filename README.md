@@ -8,7 +8,7 @@ Japanese reading — in a popup that follows your system light/dark theme.
 | <kbd>Win</kbd>+<kbd>Alt</kbd>+<kbd>A</kbd> | Translate the selection (one panel per configured engine) |
 | <kbd>Win</kbd>+<kbd>Alt</kbd>+<kbd>S</kbd> | Annotate Japanese text with kana / furigana |
 
-Both hotkeys can be changed or disabled in [`settings.json`](#configahksettingsjson).
+Both hotkeys can be changed or disabled in [`settings.json`](#settingsjson).
 
 The translate popup also has a text box, so you can keep typing new phrases
 without re-selecting anything. Results stream in as they arrive, each engine in
@@ -36,9 +36,9 @@ cd text-tools
 That copies the program files to `~\.local\bin\text-tools`, puts small
 `translate.ps1` and `kana.ps1` shims in `~\.local\bin` for the command line,
 downloads the Japanese dictionary data, and writes starter configuration to
-`~\.config`. Then:
+`~\.config\text-tools`. Then:
 
-1. If you want AI translation, put your API keys in `~\.config\translate\auth.json`.
+1. If you want AI translation, put your API keys in `~\.config\text-tools\auth.json`.
    Skip this if you only use the free `google` engine.
 2. Run `~\.local\bin\text-tools\ahk\text.ahk`.
 3. Select some text and press <kbd>Win</kbd>+<kbd>Alt</kbd>+<kbd>A</kbd> (the default).
@@ -66,6 +66,11 @@ How it decides what to do:
 - **Configuration** is never silently overwritten. A file you have customised is
   kept and reported; `auth.json` is written once and then never touched again,
   because it holds your API keys.
+- **Older configuration** in `~\.config\translate\` and `~\.config\ahk\settings.json`
+  is migrated into any of the four files that does not exist yet. The old files
+  are only read, never changed or deleted; keys with no place in the new layout
+  are reported rather than carried over. Delete the old files yourself once
+  everything works.
 
 Updating later:
 
@@ -75,16 +80,80 @@ Updating later:
 
 ## Configuration
 
-All configuration lives under `%USERPROFILE%\.config` (written `~\.config`
-below). This location is fixed.
+All configuration lives in one directory, `%USERPROFILE%\.config\text-tools`
+(written `~\.config\text-tools` below):
 
-### `~\.config\ahk\settings.json`
+| File | Read by | Purpose |
+| --- | --- | --- |
+| `config.json` | the tools themselves | Each tool's options in its own section, plus the shared proxy |
+| `settings.json` | the AutoHotkey front-end | Hotkeys, popup appearance, and which engines each popup runs |
+| `models.json` | AI engines | Providers, their base URLs, API flavour, and models |
+| `auth.json` | AI engines | API keys, one per provider. **Never commit this.** |
+
+Set `TEXT_TOOLS_CONFIG_DIR` to use a different directory instead — useful for
+testing without disturbing your real keys. The translator, the kana tool and
+the AutoHotkey front-end all honour it, and so does `deploy.ps1`.
+
+### `config.json`
+
+```jsonc
+{
+  "proxy": {                     // shared by every tool that goes online
+    "http": "http://127.0.0.1:7890",
+    "https": "http://127.0.0.1:7890",
+    "providers": ["google", "openai"]   // only these use the proxy
+  },
+  "llm": {                       // every AI engine
+    "defaultThinkingLevel": "off",
+    "modelThinkingLevels": { "openai/gpt-5.6-sol": "low" },
+    "connectTimeoutSeconds": 10
+  },
+  "translate": {
+    "model": "deepseek/deepseek-v4-flash",   // used when -Model is not given
+    "chineseRatioThreshold": 0.3,
+    "ai": { "systemPrompt": "...", "userPrompt": "..." }
+  },
+  "kana": { "to": "hiragana", "mode": "furigana" }
+}
+```
+
+`proxy.providers` lists the providers (as named in `models.json`, or `google`)
+that go through the proxy; the rest connect directly.
+
+`llm.connectTimeoutSeconds` (a positive integer, default 10) limits only
+connecting to the provider — the DNS lookup and the TCP and TLS handshakes. It
+does not limit how long a response may take. Thinking levels are `off`, `low`,
+`medium` or `high`; `modelThinkingLevels` overrides `defaultThinkingLevel` for
+one `provider/model`.
+
+`translate.chineseRatioThreshold` (0 to 1) is the share of Chinese characters
+at which automatic detection translates into English instead of Chinese.
+
+The two prompts sent to the model live under `translate.ai`:
+
+- `systemPrompt` sets the rules the model follows for every request.
+- `userPrompt` is the instruction for each request. `{language}` in it is
+  replaced with `English` or `Simplified Chinese`. The selected text is always
+  appended after it as a `<text>…</text>` block, so the instruction may refer
+  to `<text>` but should not contain the block itself.
+
+Both fall back to built-in defaults when missing or empty; a `userPrompt`
+that is not a string is an error. The `google` engine uses neither.
+
+`kana.to` picks the reading script — `hiragana`, `katakana`, or `romaji`.
+`kana.mode` is `ruby` for HTML `<ruby>` markup, or anything else
+(conventionally `furigana`) for the plain `日本語（にほんご）` form. A missing or
+unreadable file falls back to hiragana furigana.
+
+### `settings.json`
 
 Read by the AutoHotkey front-end.
 
 ```jsonc
 {
-  "translate": ["google", "openai/gpt-5.6-sol"],  // one panel per entry
+  "engines": {
+    "translate": ["google", "openai/gpt-5.6-sol"]  // one panel per entry
+  },
   "hotkeys": {
     "translate": "#!a",         // Win+Alt+A
     "kana": "#!s"               // null or "" disables it
@@ -99,13 +168,12 @@ Read by the AutoHotkey front-end.
     "maxHeight": 1000,          // 150-10000
     "lineHeight": 1,            // 0.8-4, multiple of the natural line height
     "padding": 14               // 0-48, inner padding of the text boxes
-  },
-  "japanese": { "kana": { "to": "hiragana", "mode": "furigana" } }
+  }
 }
 ```
 
-Each `translate` entry is either `google` (free, no key) or `provider/model`,
-where `provider` matches a key in `models.json`.
+Each `engines.translate` entry is either `google` (free, no key) or
+`provider/model`, where `provider` matches a key in `models.json`.
 
 `hotkeys` values use AutoHotkey v2 [hotkey syntax](https://www.autohotkey.com/docs/v2/Hotkeys.htm):
 `#` is Win, `!` Alt, `^` Ctrl and `+` Shift, so `#!a` is <kbd>Win</kbd>+<kbd>Alt</kbd>+<kbd>A</kbd>;
@@ -117,40 +185,25 @@ reported in a popup at startup, and that action stays off rather than falling
 back to its default; the other hotkey keeps working. Hotkeys are global and
 take over the key combination from every other program.
 
-`japanese.kana.to` picks the reading script — `hiragana`, `katakana`, or
-`romaji`. `mode` is `ruby` for HTML `<ruby>` markup, or anything else
-(conventionally `furigana`) for the plain `日本語（にほんご）` form.
+### `models.json` and `auth.json`
 
-### `~\.config\translate\`
+```jsonc
+// models.json: one entry per provider
+{
+  "openai": {
+    "baseUrl": "https://api.openai.com/v1",
+    "api": "openai-responses",
+    "models": [{ "id": "gpt-5.6-sol" }]
+  }
+}
 
-| File | Purpose |
-| --- | --- |
-| `auth.json` | API keys, one per provider. **Never commit this.** |
-| `models.json` | Providers, their base URLs, API flavour, and models |
-| `config.json` | Default model, proxy, connection timeout, language-detection threshold, prompts |
+// auth.json: the key for each provider, under the same name
+{ "openai": "sk-..." }
+```
 
-`api` in `models.json` must be one of `openai-completions`,
-`openai-responses`, or `anthropic-messages`.
-
-`connectTimeoutSeconds` in `config.json` (a positive integer, default 10)
-limits only connecting to the provider — the DNS lookup and the TCP and TLS
-handshakes. It does not limit how long a response may take. The `google`
-engine does not use it.
-
-The two prompts sent to the model live under `ai` in `config.json`:
-
-- `ai.systemPrompt` sets the rules the model follows for every request.
-- `ai.userPrompt` is the instruction for each request. `{language}` in it is
-  replaced with `English` or `Simplified Chinese`. The selected text is always
-  appended after it as a `<text>…</text>` block, so the instruction may refer
-  to `<text>` but should not contain the block itself.
-
-Both fall back to built-in defaults when missing or empty; a `userPrompt`
-that is not a string is an error. The `google` engine uses neither.
-
-Set `TRANSLATE_CONFIG_DIR` to point the translator at a different directory —
-useful for testing without disturbing your real keys. It affects only the
-translator; the AutoHotkey front-end and the kana tool do not read it.
+`api` must be one of `openai-completions`, `openai-responses`, or
+`anthropic-messages`. An engine is named `provider/model`, for example
+`openai/gpt-5.6-sol`.
 
 ## Command line
 

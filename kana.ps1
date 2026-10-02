@@ -7,8 +7,8 @@
     kuromoji. Node.js and the vendored dictionary files must be present;
     deploy.ps1 installs them.
 
-    Reading direction and output style come from the japanese.kana section of
-    ~/.config/ahk/settings.json, falling back to hiragana furigana.
+    Reading direction and output style come from the kana section of
+    ~/.config/text-tools/config.json, falling back to hiragana furigana.
 
 .EXAMPLE
     .\kana.ps1 -Text '<japanese text>'
@@ -69,16 +69,23 @@ function Get-KanaConfigValue {
 
 # ---------------------------------------------------------------------------
 # Get-KanaConfig
-#   Load the japanese.kana settings. Any missing file or unreadable JSON falls
-#   back to the defaults: annotation is more useful than an error here.
+#   Load the kana section of config.json. Any missing file or unreadable JSON
+#   falls back to the defaults: annotation is more useful than an error here.
 # ---------------------------------------------------------------------------
 function Get-KanaConfig {
     $default = [pscustomobject]@{
         to = 'hiragana'
         mode = 'furigana'
     }
-    # Duplicated from Config.ps1: this script does not import the module.
-    $configPath = Join-Path $env:USERPROFILE '.config\ahk\settings.json'
+    # Duplicated from Get-ConfigDirectory in common\Config.ps1, which this
+    # script does not load.
+    $directory =
+        if ($env:TEXT_TOOLS_CONFIG_DIR) {
+            $env:TEXT_TOOLS_CONFIG_DIR
+        } else {
+            Join-Path $env:USERPROFILE '.config\text-tools'
+        }
+    $configPath = Join-Path $directory 'config.json'
 
     if (!(Test-Path -LiteralPath $configPath)) {
         return $default
@@ -90,8 +97,7 @@ function Get-KanaConfig {
         return $default
     }
 
-    $japanese = Get-KanaConfigValue $root 'japanese' $null
-    $kana = Get-KanaConfigValue $japanese 'kana' $default
+    $kana = Get-KanaConfigValue $root 'kana' $default
 
     return [pscustomobject]@{
         to = Get-KanaConfigValue $kana 'to' $default.to

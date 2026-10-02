@@ -683,7 +683,7 @@ StartTextToolTranslateTasks(run) {
     FileAppend(engines, engineFile, "UTF-8-RAW")
     batchErrorFile := run.Dir "\batch.err"
     process := Proc(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
-        TextToolRoot "\ahk\run-batch.ps1", "-InputFile", run.Input,
+        TextToolRoot "\ahk\run-batch.ps1", "-Tool", "translate", "-InputFile", run.Input,
         "-EngineFile", engineFile, "-OutputDirectory", run.Dir], batchErrorFile)
     run.Procs.Push(process)
     for row in batch.Tasks {

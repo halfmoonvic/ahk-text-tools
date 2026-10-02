@@ -240,7 +240,7 @@ text-tools/
 ├── ahk/
 │   ├── text.ahk            <- entry point
 │   ├── json.ahk, proc.ahk  <- #Include'd by text.ahk
-│   ├── run-batch.ps1       <- runs all translate engines in one process
+│   ├── run-batch.ps1       <- runs all engines of one tool in one process
 │   └── run-task.ps1        <- wraps the kana child process
 ├── common/                 <- JSON, child process and config helpers
 ├── llm/                    <- streams a prompt through a configured model

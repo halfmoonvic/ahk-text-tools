@@ -1,12 +1,15 @@
-# run-batch.ps1 - Runs every translate engine of one popup in a single process.
+# run-batch.ps1 - Runs every engine of one tool in a single process.
 #
-# text.ahk starts this once per run instead of one PowerShell per engine. Each
-# engine translates on its own runspace thread and reports through N.out, N.err
-# and N.status in OutputDirectory, N being its line number in EngineFile.
-# text.ahk treats N.status as the signal that the other two files are final, so
-# it must be the last file an engine writes, and must appear in one step.
+# text.ahk starts this once per run instead of one PowerShell per engine. Tool
+# names a <tool>\<Tool>.Core.psm1 module whose Invoke-<Tool> takes -Text,
+# -OutputFile and -Engine. Each engine runs on its own runspace thread and
+# reports through N.out, N.err and N.status in OutputDirectory, N being its
+# line number in EngineFile. text.ahk treats N.status as the signal that the
+# other two files are final, so it must be the last file an engine writes, and
+# must appear in one step.
 
 param(
+    [Parameter(Mandatory=$true)][ValidateSet('translate', 'kana', IgnoreCase = $false)][string] $Tool,
     [Parameter(Mandatory=$true)][string] $InputFile,
     [Parameter(Mandatory=$true)][string] $EngineFile,
     [Parameter(Mandatory=$true)][string] $OutputDirectory
@@ -19,17 +22,17 @@ $env:TEMP = $OutputDirectory
 $env:TMP = $env:TEMP
 
 # No exit in here: it would end the whole process and every other engine with it.
-$translateEngine = {
-    param([string] $Module, [string] $Text, [string] $Engine, [string] $Prefix)
+$runEngine = {
+    param([string] $Module, [string] $Command, [string] $Tool, [string] $Text, [string] $Engine, [string] $Prefix)
     $ErrorActionPreference = 'Stop'
     $utf8 = [Text.UTF8Encoding]::new($false)
     $exitCode = 1
     try {
         Import-Module $Module
-        Invoke-Translate -Text $Text -OutputFile "$Prefix.out" -Engine $Engine
+        & $Command -Text $Text -OutputFile "$Prefix.out" -Engine $Engine
         $exitCode = 0
     } catch {
-        [IO.File]::WriteAllText("$Prefix.err", 'translate: ' + $_.Exception.Message, $utf8)
+        [IO.File]::WriteAllText("$Prefix.err", "${Tool}: " + $_.Exception.Message, $utf8)
     } finally {
         [IO.File]::WriteAllText("$Prefix.status.tmp", [string]$exitCode, $utf8)
         [IO.File]::Move("$Prefix.status.tmp", "$Prefix.status")
@@ -43,17 +46,21 @@ try {
     $text = [IO.File]::ReadAllText($InputFile, [Text.UTF8Encoding]::new($false, $true))
     $engines = [IO.File]::ReadAllLines($EngineFile, [Text.UTF8Encoding]::new($false, $true))
     if ($engines.Count -eq 0) {
-        throw 'no translate engines given'
+        throw 'no engines given'
     }
 
-    $module = Join-Path (Split-Path $PSScriptRoot -Parent) 'translate\Translate.Core.psm1'
+    $name = $Tool.Substring(0, 1).ToUpperInvariant() + $Tool.Substring(1)
+    $module = Join-Path (Split-Path $PSScriptRoot -Parent) "$Tool\$name.Core.psm1"
+    $command = "Invoke-$name"
     $pool = [runspacefactory]::CreateRunspacePool(1, $engines.Count)
     $pool.Open()
     for ($index = 0; $index -lt $engines.Count; $index++) {
         $shell = [powershell]::Create()
         $shell.RunspacePool = $pool
-        [void]$shell.AddScript($translateEngine).
+        [void]$shell.AddScript($runEngine).
             AddArgument($module).
+            AddArgument($command).
+            AddArgument($Tool).
             AddArgument($text).
             AddArgument($engines[$index]).
             AddArgument((Join-Path $OutputDirectory ($index + 1)))

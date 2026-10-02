@@ -38,7 +38,7 @@ dictionary data, and writes starter configuration to `~\.config`. Then:
 
 1. If you want AI translation, put your API keys in `~\.config\translate\auth.json`.
    Skip this if you only use the free `google` engine.
-2. Run `~\.local\bin\auto_hotkey\text.ahk`.
+2. Run `~\.local\bin\ahk\text.ahk`.
 3. Select some text and press <kbd>Win</kbd>+<kbd>Alt</kbd>+<kbd>A</kbd> (the default).
 
 To start it automatically, put a shortcut to `text.ahk` in your Startup folder
@@ -167,14 +167,14 @@ to diagnose a problem without involving AutoHotkey:
 
 ## Layout
 
-`text.ahk` finds the other scripts by stripping `\auto_hotkey\<file>` from its
+`text.ahk` finds the other scripts by stripping `\ahk\<file>` from its
 own path, so **this two-level structure is required**:
 
 ```
 text-tools/
-├── translate.ps1           <- must sit one level above auto_hotkey/
+├── translate.ps1           <- must sit one level above ahk/
 ├── kana.ps1
-├── auto_hotkey/
+├── ahk/
 │   ├── text.ahk            <- entry point
 │   ├── json.ahk, proc.ahk  <- #Include'd by text.ahk
 │   ├── run-batch.ps1       <- runs all translate engines in one process
@@ -192,7 +192,7 @@ text-tools/
     └── vendor/             <- fetched by deploy.ps1, not in git
 ```
 
-Moving `text.ahk` out of `auto_hotkey/` breaks it.
+Moving `text.ahk` out of `ahk/` breaks it.
 
 ## License
 

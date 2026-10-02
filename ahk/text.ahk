@@ -9,7 +9,7 @@ TextToolViews := Map()
 TextToolInputs := Map()
 TextToolThemeWindows := Map()
 TextToolThemeReader := ReadWindowsAppTheme
-TextToolRoot := RegExReplace(A_LineFile, "\\auto_hotkey\\[^\\]+$", "")
+TextToolRoot := RegExReplace(A_LineFile, "\\ahk\\[^\\]+$", "")
 OnMessage(0x115, ScrollTextTools)
 OnMessage(0x20A, WheelTextTools)
 OnMessage(0x100, TextToolInputKey)
@@ -655,7 +655,7 @@ StartTextToolRunTasks(run) {
         run.Tasks.Push(task)
         try {
             task.Process := Proc(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
-                TextToolRoot "\auto_hotkey\run-task.ps1", "-Script", TextToolRoot "\" batch.ScriptName,
+                TextToolRoot "\ahk\run-task.ps1", "-Script", TextToolRoot "\" batch.ScriptName,
                 "-InputFile", run.Input, "-OutputFile", task.OutputFile], task.ErrorFile)
             run.Procs.Push(task.Process)
             row.Status.Value := "Running..."
@@ -680,7 +680,7 @@ StartTextToolTranslateTasks(run) {
     FileAppend(engines, engineFile, "UTF-8-RAW")
     batchErrorFile := run.Dir "\batch.err"
     process := Proc(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
-        TextToolRoot "\auto_hotkey\run-batch.ps1", "-InputFile", run.Input,
+        TextToolRoot "\ahk\run-batch.ps1", "-InputFile", run.Input,
         "-EngineFile", engineFile, "-OutputDirectory", run.Dir], batchErrorFile)
     run.Procs.Push(process)
     for row in batch.Tasks {

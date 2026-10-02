@@ -185,7 +185,7 @@ function Invoke-RepositoryUpdate {
 
 #region stage 1: program files ------------------------------------------------
 
-# text.ahk derives the project root by stripping "\auto_hotkey\<file>" from its
+# text.ahk derives the project root by stripping "\ahk\<file>" from its
 # own path, then looks for translate.ps1 and kana.ps1 there. The two-level
 # layout below is therefore mandatory - do not flatten it.
 # ---------------------------------------------------------------------------
@@ -197,11 +197,11 @@ function Install-ProgramFiles {
     Write-Step "Deploying program files to $TargetDir"
 
     $files = @(
-        'auto_hotkey\text.ahk'
-        'auto_hotkey\json.ahk'
-        'auto_hotkey\proc.ahk'
-        'auto_hotkey\run-batch.ps1'
-        'auto_hotkey\run-task.ps1'
+        'ahk\text.ahk'
+        'ahk\json.ahk'
+        'ahk\proc.ahk'
+        'ahk\run-batch.ps1'
+        'ahk\run-task.ps1'
         'translate.ps1'
         'kana.ps1'
         'common\Config.ps1'
@@ -509,7 +509,7 @@ if ($script:Warnings.Count -gt 0) {
 }
 
 $authPath = Join-Path $ConfigDir 'translate\auth.json'
-$entryPoint = Join-Path $TargetDir 'auto_hotkey\text.ahk'
+$entryPoint = Join-Path $TargetDir 'ahk\text.ahk'
 
 Write-Host ''
 Write-Host 'Next steps:' -ForegroundColor White

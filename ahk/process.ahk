@@ -1,6 +1,6 @@
 ; Each suspended process joins a kill-on-close job before any script can run.
 ; Native handles provide exit status and avoid PID reuse during cancellation.
-class Proc {
+class ChildProcess {
     __New(arguments, errorFile) {
         this.Handle := 0
         this.Job := 0

@@ -248,7 +248,7 @@ text-tools/
 ├── kana.ps1                <- terminal entry point
 ├── ahk/
 │   ├── text.ahk            <- entry point
-│   ├── json.ahk, proc.ahk  <- #Include'd by text.ahk
+│   ├── json.ahk, process.ahk  <- #Include'd by text.ahk
 │   └── run-batch.ps1       <- runs all engines of one tool in one process
 ├── common/                 <- JSON, child process and config helpers
 ├── llm/                    <- streams a prompt through a configured model

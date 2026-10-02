@@ -219,7 +219,7 @@ function Install-ProgramFiles {
     $files = @(
         'ahk\text.ahk'
         'ahk\json.ahk'
-        'ahk\proc.ahk'
+        'ahk\process.ahk'
         'ahk\run-batch.ps1'
         'translate.ps1'
         'kana.ps1'

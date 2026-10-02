@@ -1,7 +1,7 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
 #Include json.ahk
-#Include proc.ahk
+#Include process.ahk
 
 TextToolBatches := Map()
 TextToolRuns := Map()
@@ -652,7 +652,7 @@ StartTextToolRunTasks(run) {
         engines .= row.Engine "`n"
     engineFile := run.Dir "\engines.txt"
     FileAppend(engines, engineFile, "UTF-8-RAW")
-    run.Process := Proc(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+    run.Process := ChildProcess(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
         TextToolRoot "\ahk\run-batch.ps1", "-Tool", batch.Tool, "-InputFile", run.Input,
         "-EngineFile", engineFile, "-OutputDirectory", run.Dir], run.ErrorFile)
     for row in batch.Tasks {
